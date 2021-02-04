@@ -1,0 +1,13 @@
+{
+    "name": "teleclient/plugablebase",
+    "description": "Project description",
+    "type": "project",
+    "require": {
+        "danog/madelineproto": "^5.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "teleclient\\plugablebase\\": "src"
+        }
+    }
+}
