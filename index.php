@@ -2,21 +2,22 @@
 
 declare(strict_types=1);
 
-//if (\file_exists('vendor/autoload.php')) {
-//    include 'vendor/autoload.php';
-//} else {
-if (!\file_exists('madeline.php')) {
-    \copy('https://phar.madelineproto.xyz/madeline.php', 'madeline.php');
-}
-include 'madeline.php';
-//}
-require_once 'BuiltinPlugin.php';
-require_once    'YourPlugin.php';
+use tgseclib\Math\BigInteger\Engines\PHP32;
+
+define('SCRIPT_INFO', 'BASE_P V0.1.0'); // <== Do not change!
+
+require_once 'functions.php';
+includeMadeline();
+$robotConfig = include('config.php');
+require_once 'plugins/BuiltinPlugin.php';
+require_once    'plugins/YourPlugin.php';
 
 class EventHandler extends \danog\MadelineProto\EventHandler
 {
     private BuiltinPlugin $builtinPlugin;
     private    YourPlugin $yourPlugin;
+    private int    $robotId;
+    private object $robotConfig;
 
     function __construct(\danog\MadelineProto\APIWrapper $api)
     {
@@ -25,6 +26,8 @@ class EventHandler extends \danog\MadelineProto\EventHandler
     }
     public function onStart(): \Generator
     {
+        //$resp = yield $this->messages->sendMessage(['message' => 'Hi', 'peer' => $this->getRobotId]);
+        //yield $this->echo('onStart executed.' . PHP_EOL);
         yield $this->builtinPlugin->onStart();
         yield $this->yourPlugin->onStart();
     }
@@ -33,15 +36,32 @@ class EventHandler extends \danog\MadelineProto\EventHandler
         yield $this->builtinPlugin($update);
         yield $this->yourPlugin($update);
     }
+
+    public function setSelf(array $self)
+    {
+        $this->robotId = $self['id'];
+    }
+    public function getRobotId(array $self): int
+    {
+        return $this->robotId;
+    }
+    public function setRobotConfig(object $config)
+    {
+        $this->robotConfig = $config;
+    }
+    public function getRobotConfig(): object
+    {
+        return $this->robotConfig;
+    }
 }
 
-$settings['app_info']['api_id']   = 904912;
-$settings['app_info']['api_hash'] = "8208f08eefc502bedea8b5d437be898e";
-$settings['app_info']['app_version'] = "DIALOG V0.1.0";
-$settings['logger']['logger'] = danog\MadelineProto\Logger::FILE_LOGGER;
-$settings['logger']['logger_level'] = danog\MadelineProto\Logger::ERROR;
+$session  = $robotConfig->mp[0]['session'];
+$settings = $robotConfig->mp[0]['settings'];
+$mp = new \danog\MadelineProto\API($session, $settings);
 
-$mp = new \danog\MadelineProto\API('madeline.madeline', $settings);
-$mp->startAndLoop(EventHandler::class);
+echo ("Authorization State: " . authorizationStateDesc(authorizationState($mp)) . PHP_EOL);
+echo ("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false') . PHP_EOL);
+
+safeStartAndLoop($mp, EventHandler::class, $robotConfig);
 
 echo ('Bye, bye!');

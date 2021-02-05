@@ -19,7 +19,14 @@ class BuiltinPlugin
 
     public function __invoke(array $update): \Generator
     {
-        return;
-        yield;
+        switch ($update['_']) {
+            case 'updateNewChannelMessage':
+            case 'updateReadChannelInbox':
+            case 'updateEditMessage':
+                break;
+            default:
+                return;
+        }
+        yield $this->eh->echo($update['_'] . PHP_EOL);
     }
 }
