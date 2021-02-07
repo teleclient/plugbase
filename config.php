@@ -7,6 +7,8 @@ return (object) [
     'zone' => 'Asia/Tehran',
     'mp'   => [
         0 => [
+            'phone'    => '+19498364399',
+            'password' => '',
             'session'  => 'madeline.madeline',
             'settings' => [
                 'app_info' => [

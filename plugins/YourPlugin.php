@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 class YourPlugin
 {
-    private object $eh;
+    private BaseEventHandler $eh;
 
-    function __construct(EventHandler $eh)
+    function __construct(BaseEventHandler $eh)
     {
         $this->eh = $eh;
     }
@@ -17,7 +17,7 @@ class YourPlugin
         yield;
     }
 
-    public function __invoke(array $update): \Generator
+    public function handleEvent(array $update): \Generator
     {
         return;
         yield;

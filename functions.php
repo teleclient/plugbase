@@ -76,8 +76,17 @@ function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, ob
             try {
                 $started = false;
                 $me = yield $mp->start();
-                \danog\madelineproto\Tools::wait(yield $mp->setEventHandler($eventHandler));
+                if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
+                    echo ("Not Logged-in!" . PHP_EOL);
+                    throw new \ErrorException("Not Logged-in!", \danog\madelineproto\Logger::FATAL_ERROR);
+                }
+                yield $mp->setEventHandler($eventHandler);
                 $eh = $mp->getEventHandler($eventHandler);
+                $me = yield $mp->getSelf();
+                $mp->echo(toJSON($me) . PHP_EOL);
+                if (!$me || !is_array($me)) {
+                    throw new ErrorException('Invalid EventHandler object');
+                }
                 $eh->setSelf($me);
                 $eh->setRobotConfig($config);
                 foreach ($genLoops as $genLoop) {
