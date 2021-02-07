@@ -8,4 +8,10 @@ madeline.phar
 madeline.phar.version
 madeline.php
 
+madeline.madeline.ipc
+madeline.madeline.safe.php.temp.php
+madeline.madeline.callback.ipc
+madeline.madeline.lightState.php
+madeline.madeline.safe.php
+
 trace.txt

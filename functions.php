@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+
 function toJSON($var, bool $pretty = true): ?string
 {
     if (isset($var['request'])) {
@@ -11,6 +12,27 @@ function toJSON($var, bool $pretty = true): ?string
     $json = \json_encode($var, $opts | ($pretty ? JSON_PRETTY_PRINT : 0));
     $json = ($json !== '') ? $json : var_export($var, true);
     return ($json != false) ? $json : null;
+}
+
+function parseCommand(array $update, string $prefixes = '!/', int $maxParams = 3): array
+{
+    $command = ['prefix' => '', 'verb' => null, 'params' => []];
+    if ($update['_'] !== 'updateNewMessage' || !isset($update['message']['message'])) {
+        $msg = $update['message']['message'];
+        //$msg = $msg ? trim($msg) : '';
+        if (strlen($msg) >= 2 && strpos($prefixes, $msg[0]) !== false) {
+            $verb = strtolower(substr($msg, 1, strpos($msg . ' ', ' ') - 1));
+            if (ctype_alnum($verb)) {
+                $command['prefix'] = $msg[0];
+                $command['verb']   = $verb;
+                $tokens = explode(' ', $msg, $maxParams + 1);
+                for ($i = 1; $i < count($tokens); $i++) {
+                    $command['params'][$i - 1] = trim($tokens[$i]);
+                }
+            }
+        }
+    }
+    return $command;
 }
 
 function logit(string $entry, object $api = null, int $level = \danog\madelineproto\Logger::NOTICE): \Generator
@@ -65,6 +87,51 @@ function authorizationStateDesc(int $authorized): string
     }
 }
 
+
+function myStartAndLoop(\danog\madelineproto\API $MadelineProto, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
+{
+    $maxRecycles  = 10;
+    $recycleTimes = [];
+    while (true) {
+        try {
+            $MadelineProto->loop(function () use ($MadelineProto, $genLoop) {
+                yield $MadelineProto->start();
+                yield $MadelineProto->setEventHandler('\EventHandler');
+                if ($genLoop !== null) {
+                    $genLoop->start(); // Do NOT use yield.
+                }
+
+                // Synchronously wait for the update loop to exit normally.
+                // The update loop exits either on ->stop or ->restart (which also calls ->stop).
+                \danog\madelineproto\Tools::wait(yield from $MadelineProto->API->loop());
+                yield $MadelineProto->logger("Update loop exited!");
+            });
+            sleep(5);
+            break;
+        } catch (\Throwable $e) {
+            try {
+                $MadelineProto->logger->logger((string) $e, \danog\madelineproto\Logger::FATAL_ERROR);
+                // quit recycling if more than $maxRecycles happened within the last minutes.
+                $now = time();
+                foreach ($recycleTimes as $index => $restartTime) {
+                    if ($restartTime > $now - 1 * 60) {
+                        break;
+                    }
+                    unset($recycleTimes[$index]);
+                }
+                if (count($recycleTimes) > $maxRecycles) {
+                    // quit for good
+                    \danog\madelineproto\Shutdown::removeCallback('restarter');
+                    \danog\madelineproto\Magic::shutdown(1);
+                    break;
+                }
+                $recycleTimes[] = $now;
+                $MadelineProto->report("Surfaced: $e");
+            } catch (\Throwable $e) {
+            }
+        }
+    };
+}
 
 function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, object $config = null, array $genLoops = []): void
 {
