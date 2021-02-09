@@ -2,7 +2,18 @@
 
 declare(strict_types=1);
 
-return (object) [
+\date_default_timezone_set('UTC');
+\ignore_user_abort(true);
+\error_reporting(E_ALL);                                 // always TRUE
+ini_set('max_execution_time',     '0');
+ini_set('ignore_repeated_errors', '1');                 // always TRUE
+ini_set('display_startup_errors', '1');
+ini_set('display_errors',         '1');                 // FALSE only in production or real server
+ini_set('log_errors',             '1');                 // Error logging engine
+ini_set('error_log',              'MadelineProto.log'); // Logging file path
+ini_set('precision',              '18');
+
+return [
     'host' => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
     'zone' => 'Asia/Tehran',
     'mp'   => [
@@ -18,7 +29,7 @@ return (object) [
                 ],
                 'logger' => [
                     'logger'       => \danog\MadelineProto\Logger::FILE_LOGGER,
-                    'logger_level' => \danog\MadelineProto\Logger::NOTICE,
+                    'logger_level' => \danog\MadelineProto\Logger::ERROR,
                 ],
                 'peer' => [
                     //'full_info_cache_time' => 60,
@@ -31,19 +42,6 @@ return (object) [
     ]
 ];
 
-function initScript()
-{
-    \date_default_timezone_set('UTC');
-    \ignore_user_abort(true);
-    \error_reporting(E_ALL);                                 // always TRUE
-    ini_set('max_execution_time',     '0');
-    ini_set('ignore_repeated_errors', '1');                 // always TRUE
-    ini_set('display_startup_errors', '1');
-    ini_set('display_errors',         '1');                 // FALSE only in production or real server
-    ini_set('log_errors',             '1');                 // Error logging engine
-    ini_set('error_log',              'MadelineProto.log'); // Logging file path
-    ini_set('precision',              '18');
-}
 
 //$settings['app_info']['api_id']   = 904912;
 //$settings['app_info']['api_hash'] = "8208f08eefc502bedea8b5d437be898e";

@@ -34,6 +34,7 @@ class BuiltinPlugin
         ) {
             return false;
         }
+        yield $this->eh->logger('onAny executed.');
         /*
         \extract($vars);
 

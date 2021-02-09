@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d40c2664898217dcff7c3d215138dfe4",
+    "content-hash": "2214ec7999d28827ff5f1496c4707c67",
     "packages": [
         {
             "name": "amphp/amp",
@@ -761,16 +761,16 @@
         },
         {
             "name": "amphp/mysql",
-            "version": "v2.1.0",
+            "version": "v2.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/amphp/mysql.git",
-                "reference": "03c69546c07cacf4cb09790e77f0777e9d3ae7f7"
+                "reference": "f14d62f52aa1ecd47827bcf36b14026d7d0209d5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amphp/mysql/zipball/03c69546c07cacf4cb09790e77f0777e9d3ae7f7",
-                "reference": "03c69546c07cacf4cb09790e77f0777e9d3ae7f7",
+                "url": "https://api.github.com/repos/amphp/mysql/zipball/f14d62f52aa1ecd47827bcf36b14026d7d0209d5",
+                "reference": "f14d62f52aa1ecd47827bcf36b14026d7d0209d5",
                 "shasum": ""
             },
             "require": {
@@ -815,7 +815,7 @@
             "description": "Asynchronous MySQL client for PHP based on Amp.",
             "support": {
                 "issues": "https://github.com/amphp/mysql/issues",
-                "source": "https://github.com/amphp/mysql/tree/v2.1.0"
+                "source": "https://github.com/amphp/mysql/tree/v2.1.1"
             },
             "funding": [
                 {
@@ -823,7 +823,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2020-11-10T05:46:55+00:00"
+            "time": "2021-02-04T17:10:15+00:00"
         },
         {
             "name": "amphp/parallel",
@@ -950,16 +950,16 @@
         },
         {
             "name": "amphp/postgres",
-            "version": "v1.3.2",
+            "version": "v1.3.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/amphp/postgres.git",
-                "reference": "b1a2f34817fb510a69b79cd56f2c98c4f4e9ff71"
+                "reference": "1579d9fc49a49d8ae1d614933957eaea8e5d6f0f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amphp/postgres/zipball/b1a2f34817fb510a69b79cd56f2c98c4f4e9ff71",
-                "reference": "b1a2f34817fb510a69b79cd56f2c98c4f4e9ff71",
+                "url": "https://api.github.com/repos/amphp/postgres/zipball/1579d9fc49a49d8ae1d614933957eaea8e5d6f0f",
+                "reference": "1579d9fc49a49d8ae1d614933957eaea8e5d6f0f",
                 "shasum": ""
             },
             "require": {
@@ -1008,7 +1008,7 @@
             ],
             "support": {
                 "issues": "https://github.com/amphp/postgres/issues",
-                "source": "https://github.com/amphp/postgres/tree/v1.3.2"
+                "source": "https://github.com/amphp/postgres/tree/v1.3.3"
             },
             "funding": [
                 {
@@ -1016,7 +1016,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2020-12-06T22:12:22+00:00"
+            "time": "2021-01-28T21:16:11+00:00"
         },
         {
             "name": "amphp/process",
@@ -1974,7 +1974,7 @@
         },
         {
             "name": "danog/madelineproto",
-            "version": "6.0.0",
+            "version": "dev-master",
             "source": {
                 "type": "git",
                 "url": "https://github.com/danog/MadelineProto.git",
@@ -2043,6 +2043,7 @@
             "suggest": {
                 "ext-libtgvoip": "Install the php-libtgvoip extension to make phone calls (https://github.com/danog/php-libtgvoip)"
             },
+            "default-branch": true,
             "type": "project",
             "autoload": {
                 "psr-4": {
@@ -3218,7 +3219,9 @@
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "danog/madelineproto": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": [],

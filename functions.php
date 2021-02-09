@@ -44,22 +44,59 @@ function logit(string $entry, object $api = null, int $level = \danog\madelinepr
     }
 }
 
-function includeMadeline(string $source = null)
+function includeMadeline(string $source = 'phar')
 {
-    if (!$source) {
-        if (\file_exists('vendor/autoload.php')) {
-            include 'vendor/autoload.php';
-        } else {
+    switch ($source) {
+        case 'phar':
             if (!\file_exists('madeline.php')) {
                 \copy('https://phar.madelineproto.xyz/madeline.php', 'madeline.php');
             }
             include 'madeline.php';
-        }
-    } elseif ($source === 'composer') {
-    } elseif ($source === 'phar') {
+            break;
+        case 'composer':
+            include 'vendor/autoload.php';
+            break;
+        default:
+            throw new \ErrorException("Invalid argument: '$source'");
     }
 }
 
+function milliDate(string $zone, float $time = null, string $format = 'H:i:s.v'): string
+{
+    $time   = $time ?? \microtime(true);
+    $zoneObj = new \DateTimeZone($zone);
+    $dateObj = \DateTimeImmutable::createFromFormat('U.u', number_format($time, 6, '.', ''));
+    $dateObj->setTimeZone($zoneObj);
+    return $dateObj->format($format);
+}
+
+class UserDate
+{
+    private $timeZoneObj;
+
+    function __construct(string $zone)
+    {
+        $this->timeZoneObj = new \DateTimeZone($zone);
+    }
+
+    public function milli(float $time = null, string $format = 'H:i:s.v'): string
+    {
+        $time   = $time ?? \microtime(true);
+        $dateObj = \DateTimeImmutable::createFromFormat('U.u', number_format($time, 6, '.', ''));
+        $dateObj->setTimeZone($this->timeZoneObj);
+        return $dateObj->format($format);
+    }
+
+    function mySqlmicro(float $time = null): string
+    {
+        $time   = $time ?? \microtime(true);
+        $format = 'Y-m-d H:i:s.u';
+
+        $dateObj = \DateTimeImmutable::createFromFormat('U.u', number_format($time, 6, '.', ''));
+        $dateObj->setTimeZone($this->timeZoneObj);
+        return $dateObj->format($format);
+    }
+}
 
 function authorizationState(object $api): int
 {
@@ -88,15 +125,15 @@ function authorizationStateDesc(int $authorized): string
 }
 
 
-function myStartAndLoop(\danog\madelineproto\API $MadelineProto, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
+function myStartAndLoop(\danog\madelineproto\API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
 {
     $maxRecycles  = 10;
     $recycleTimes = [];
     while (true) {
         try {
-            $MadelineProto->loop(function () use ($MadelineProto, $genLoop) {
+            $MadelineProto->loop(function () use ($MadelineProto, $eventHandler, $genLoop) {
                 yield $MadelineProto->start();
-                yield $MadelineProto->setEventHandler('\EventHandler');
+                yield $MadelineProto->setEventHandler($eventHandler);
                 if ($genLoop !== null) {
                     $genLoop->start(); // Do NOT use yield.
                 }
@@ -133,9 +170,8 @@ function myStartAndLoop(\danog\madelineproto\API $MadelineProto, \danog\Loop\Gen
     };
 }
 
-function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, object $config = null, array $genLoops = []): void
+function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, array $config = [], array $genLoops = []): void
 {
-    $config = $config ?? (object)[];
     $mp->async(true);
     $mp->loop(function () use ($mp, $eventHandler, $config, $genLoops) {
         $errors = [];
