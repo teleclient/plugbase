@@ -1,6 +1,6 @@
 <?php
 $head = "madeline.madeline";
-$tails = ['', ".lock", ".ipc", ".callback.ipc", ".lightState.php", ".safe.php"];
+$tails = ['', ".lock", ".ipc", ".callback.ipc", ".lightState.php", ".safe.php", ".ipcState.php"];
 foreach ($tails as $tail) {
     $file = "$head$tail";
     if (file_exists("$file")) {

@@ -17,7 +17,7 @@ class YourPlugin
         yield;
     }
 
-    public function handleEvent(array $update): \Generator
+    public function handleEvent(array $update, array $vars): \Generator
     {
         return;
         yield;

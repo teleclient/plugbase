@@ -14,10 +14,15 @@ ini_set('error_log',              'MadelineProto.log'); // Logging file path
 ini_set('precision',              '18');
 
 return [
-    'host' => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
-    'zone' => 'Asia/Tehran',
+    'admins'   => [],
+    //'officeid' => 1234,
+    //'host'     => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
+    'zone'     => 'Asia/Tehran',
+    'prefixes' => '!/',
+    'edit'     => false,
     'mp'   => [
         0 => [
+            'notification' => 'off',
             'phone'    => '+19498364399',
             'password' => '',
             'session'  => 'madeline.madeline',
@@ -41,6 +46,34 @@ return [
         ]
     ]
 ];
+
+function getHelpText(): string
+{
+    $text = '' .
+        '<b>Robot Instructions:</b><br>' .
+        '<br>' .
+        '>> <b>/help</b><br>' .
+        '   To print the robot commands<br>' .
+        ">> <b>/loop</b> on/off/state<br>" .
+        "   To query/change state of task repeater.<br>" .
+        '>> <b>/status</b><br>' .
+        '   To query the status of the robot.<br>' .
+        '>> <b>/stats</b><br>' .
+        '   To query the statistics of the robot.<br>' .
+        '>> <b>/notif OFF / ON 20</b><br>' .
+        '   No event notification or notify every 20 secs.<br>' .
+        '>> <b>/crash</b><br>' .
+        '   To generate an exception for testing.<br>' .
+        '>> <b>/restart</b><br>' .
+        '   To restart the robot.<br>' .
+        '>> <b>/stop</b><br>' .
+        '   To stop the script.<br>' .
+        '>> <b>/logout</b><br>' .
+        '   To terminate the robot\'s session.<br>' .
+        '<br>' .
+        '<b>**Valid prefixes are / and !</b><br>';
+    return $text;
+}
 
 
 //$settings['app_info']['api_id']   = 904912;
