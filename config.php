@@ -47,15 +47,15 @@ return [
     ]
 ];
 
-function getHelpText(): string
+function getHelpText(string $prefixes): string
 {
     $text = '' .
         '<b>Robot Instructions:</b><br>' .
         '<br>' .
         '>> <b>/help</b><br>' .
         '   To print the robot commands<br>' .
-        ">> <b>/loop</b> on/off/state<br>" .
-        "   To query/change state of task repeater.<br>" .
+        //">> <b>/loop</b> on/off/state<br>" .
+        //"   To query/change state of task repeater.<br>" .
         '>> <b>/status</b><br>' .
         '   To query the status of the robot.<br>' .
         '>> <b>/stats</b><br>' .

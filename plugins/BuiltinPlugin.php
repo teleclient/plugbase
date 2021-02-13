@@ -18,27 +18,59 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
         $this->totalUpdates = 0;
     }
 
-    public function onStart(): \Generator
+    public function onStart(BaseEventHandler $eh): \Generator
     {
-        yield $this->eh->echo("BuiltinPlugin::onStart executed!" . PHP_EOL);
+        $this->eh = $eh;
+
+        // Send a startup notification and wipe it if configured so 
+        $notif      = $this->getNotif();
+        $notifState = substr($notif, 0, 2) === 'on';
+        $notifAge   = strlen($notif) <= 3 ? 0 : intval(substr($notif, 3));
+        $dest       = $eh->getRobotId();
+        if ($notifState) {
+            $nowstr = $eh->formatTime($eh->getHandlerUnserialized());
+            $text = SCRIPT_INFO . ' started at ' . $nowstr . ' on ' . hostName() . ' using ' . $eh->getRobotName() . ' account.';
+            $result = yield $eh->messages->sendMessage([
+                'peer'    => $dest,
+                'message' => $text
+            ]);
+            yield $eh->logger($text, Logger::ERROR);
+            if ($notifAge > 0) {
+                $msgid = $result['updates'][1]['message']['id'];
+                $eh->callFork((function () use ($eh, $msgid, $notifAge) {
+                    try {
+                        yield $eh->sleep($notifAge);
+                        yield $eh->messages->deleteMessages([
+                            'revoke' => true,
+                            'id'     => [$msgid]
+                        ]);
+                        yield $eh->logger('Robot\'s startup message is deleted.', Logger::ERROR);
+                    } catch (\Exception $e) {
+                        yield $eh->logger($e, Logger::ERROR);
+                    }
+                })());
+            }
+        }
     }
 
-    public function handleEvent(array $update, array $vars): \Generator
+    public function __invoke(array $update, array $vars, BaseEventHandler $eh): \Generator
     {
-        $eh = $this->eh;
         $this->totalUpdates += 1;
 
-        if (!hasText($update) || !oneOf($update, 'NewMessage|EditMessage')) {
+        if (!hasText($update) || !oneOf($update, 'NewMessage')) {
+            return false;
+        }
+        if (!($vars['fromRobot'] && $vars['toRobot']) && !($vars['fromAdmin'] && $vars['toOffice'])) {
+            return false;
+        }
+        if (!isset($vars['msgText'][0]) || strpos($vars['prefixes'], $vars['msgText'][0]) === false) {
             return false;
         }
 
-        yield $eh->echo('BuiltinPlugin::onAny executed!' . PHP_EOL);
-        yield $eh->logger('BuiltinPlugin::onAny executed!', Logger::ERROR);
-
-        //yield $eh->echo(toJSON($vars) . PHP_EOL);
-
         extract($vars);
-        yield $eh->echo("Verb:'$verb'" . PHP_EOL);
+
+        $msgFront = substr(\str_replace(array("\r", "\n"), '<br>', $msgText), 0, 60);
+        yield $eh->logger(($vars['execute'] ? 'new: ' : 'old: ') . $msgFront, Logger::ERROR);
 
         $executed = false;
         switch ($fromRobot ? $verb : '') {
@@ -60,7 +92,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
             case '':
                 break;
             case 'help':
-                $text = getHelpText();
+                $text = getHelpText($eh->getPrefixes());
                 yield respond($eh, $peer, $msgId, $text);
                 yield $eh->logger("Command '/help' successfuly executed at " . date('d H:i:s!'), Logger::ERROR);
                 break;
@@ -117,10 +149,9 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
             case 'stats':
                 $text   = "Preparing statistics ....";
                 $result = yield respond($eh, $peer, $msgId, $text);
-                //$eh->echo(toJSON($result));
-                $resMsgId = $editMessage ? $result[0]['message']['id'] : $result['updates'][0]['id'];
+                $resMsgId = $eh->getEditMessage() ? $result[0]['message']['id'] : $result['updates'][0]['id'];
                 unset($result);
-                $response = yield $eh->contacts->getContacts();
+                $response = yield $eh->contacts->getContacts([]);
                 $totalCount  = count($response['users']);
                 $mutualCount = 0;
                 foreach ($response['users'] as $user) {
@@ -152,7 +183,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                     }
                 );
                 $stats  = '<b>STATISTICS</b>  (Script: ' . SCRIPT_INFO . ')<br>';
-                $stats .= "Robot Account: $eh->getRobotName<br>";
+                $stats .= "Robot Account: $eh->getRobotName()<br>";
                 $stats .= "Total Dialogs: $totalDialogsOut<br>";
                 $stats .= "Users: {$peerCounts['user']}<br>";
                 $stats .= "Bots: {$peerCounts['bot']}<br>";
@@ -167,7 +198,9 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 break;
             case 'crash':
                 yield $eh->logger("Purposefully crashing the script....", Logger::ERROR);
-                throw new \ErrorException('Artificial exception generated for testing the robot.');
+                $e = new \ErrorException('Artificial exception generated for testing the robot.');
+                //yield $this->echo($e->getTraceAsString($e) . PHP_EOL);
+                throw $e;
             case 'maxmem':
                 $arr = array();
                 try {
@@ -251,12 +284,11 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
     public function getNotif(): string
     {
         $saved = $this->eh->__get('notification');
-        echo ("Saved:'$saved'" . PHP_EOL);
+        $saved = $saved ?? 'off';
         return $saved;
     }
     public function setNotif(string $notification): void
     {
-        echo ("Saving:'$notification'" . PHP_EOL);
         if ($notification === '') throw new ErrorException("Invalid parameters: '$notification'");
         $this->eh->__set('notification', $notification);
     }

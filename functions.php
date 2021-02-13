@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use danog\madelineproto\Logger;
+use danog\MadelineProto\RPCErrorException;
+
 function toJSON($var, bool $pretty = true): ?string
 {
     if (isset($var['request'])) {
@@ -164,6 +167,99 @@ class UserDate
     }
 }
 
+function resolveDialog($mp, array $dialog, array $messages, array $chats, array $users)
+{
+    $peer     = $dialog['peer'];
+    $message  =  null;
+    foreach ($messages as $msg) {
+        if ($dialog['top_message'] === $msg['id']) {
+            $message = $msg;
+            break;
+        }
+    }
+    if ($message === null) {
+        throw new Exception("Missing top-message: " . toJSON($dialog));
+    }
+    $peerId  = null;
+    $subtype = null;
+    $name    = null;
+    $peerval = null;
+    switch ($peer['_']) {
+        case 'peerUser':
+            $peerId = $peer['user_id'];
+            foreach ($users as $user) {
+                if ($peerId === $user['id']) {
+                    $subtype = ($user['bot'] ?? false) ? 'bot' : 'user';
+                    $peerval = $user;
+                    if (isset($user['username'])) {
+                        $name = '@' . $user['username'];
+                    } elseif (($user['first_name'] ?? '') !== '' || ($user['last_name'] ?? '') !== '') {
+                        $name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+                    } elseif (isset($user['id'])) {
+                        $name = strval($user['id']);
+                    } else {
+                        $name = '';
+                    }
+                    if (!isset($message['from_id'])) {
+                        $mp->logger('ERROR user: '    . toJSON($user),    Logger::ERROR);
+                        $mp->logger('ERROR message: ' . toJSON($message), Logger::ERROR);
+                        throw new Exception('Mismatch');
+                    }
+                    break 2;
+                }
+            }
+            throw new Exception("Missing user: '$peerId'");
+        case 'peerChat':
+        case 'peerChannel':
+            $peerId = $peer['_'] === 'peerChat' ? $peer['chat_id'] : $peer['channel_id'];
+            foreach ($chats as $chat) {
+                if ($chat['id'] === $peerId) {
+                    $peerval = $chat;
+                    if (isset($chat['username'])) {
+                        $name = $chat['username'];
+                    } elseif (($chat['title'] ?? '') !== '') {
+                        $name = $chat['title'];
+                    } elseif (isset($chat['id'])) {
+                        $name = strval($chat['id']);
+                    } else {
+                        $name = '';
+                    }
+                    switch ($chat['_']) {
+                        case 'chatEmpty':
+                            $subtype = $chat['_'];
+                            break;
+                        case 'chat':
+                            $subtype = 'basicgroup';
+                            break;
+                        case 'chatForbidden':
+                            $subtype = $chat['_'];
+                            break;
+                        case 'channel':
+                            $subtype = ($chat['megagroup'] ?? false) ? 'supergroup' : 'channel';
+                            break;
+                        case 'channelForbidden':
+                            $subtype = $chat['_'];
+                            break;
+                        default:
+                            throw new Exception("Unknown subtype: '$peerId'  '" . $chat['_'] . "'");
+                    }
+                    break 2;
+                }
+            }
+            throw new Exception("Missing chat: '$peerId'");
+        default:
+            throw new Exception("Invalid peer type: '" . $peer['_'] . "'");
+    }
+    return [
+        'botapi_id'    => $peerId,
+        'subtype'      => $subtype,
+        'name'         => $name,
+        'dialog'       => $dialog,
+        'user_or_chat' => $peerval,
+        'message'      => $message
+    ];
+}
+
 function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = null): \Generator
 {
     foreach ($params as $key => $param) {
@@ -188,7 +284,7 @@ function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = nu
         'pause_min'   => $pauseMin,
         'pause_max'   => $pauseMax
     ]);
-    yield $mp->logger($json, Logger::ERROR);
+    yield $mp->logger($json, \danog\MadelineProto\Logger::ERROR);
     $limit = min($limit, $maxDialogs);
     $params = [
         'offset_date' => 0,
@@ -477,7 +573,9 @@ function oneOf(array $update, string $tails = 'NewMessage|NewChannelMessage|Edit
 
 function hasText(array $update): bool
 {
-    return isset($update['message']) && $update['message']['_'] !== 'messageService' && $update['message']['_'] !== 'messageEmpty';
+    return
+        isset($update['message']) && isset($update['message']['message']) && strlen($update['message']['message']) > 1 &&
+        $update['message']['_'] !== 'messageService' && $update['message']['_'] !== 'messageEmpty';
 }
 
 function myStartAndLoop(\danog\madelineproto\API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
@@ -536,13 +634,13 @@ function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, ar
                 $started = false;
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
                     echo ("Not Logged-in!" . PHP_EOL);
-                    throw new \ErrorException("Not Logged-in!", \danog\madelineproto\Logger::FATAL_ERROR);
+                    //throw new \ErrorException("Not Logged-in!", \danog\madelineproto\Logger::FATAL_ERROR);
                 }
                 $me = yield $mp->start();
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
-                yield $mp->echo("Robot Id: {$me['id']}" . PHP_EOL);
+                yield $mp->logger("Robot Id: {$me['id']}", Logger::ERROR);
                 yield $mp->setEventHandler($eventHandler);
                 $eh = $mp->getEventHandler($eventHandler);
                 $eh->setSelf($me);
@@ -558,7 +656,7 @@ function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, ar
                 $errors = [\time() => $errors[\time()] ?? 0];
                 $errors[\time()]++;
                 $fatal = \danog\madelineproto\Logger::FATAL_ERROR;
-                if ($errors[\time()] > 5 && (!$mp->inited() || !$started)) {
+                if ($errors[\time()] > 10 && (!$mp->inited() || !$started)) {
                     yield $mp->logger->logger("More than 10 errors in a second and not inited, exiting!", $fatal);
                     break;
                 }

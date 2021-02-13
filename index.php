@@ -36,9 +36,11 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     function __construct(\danog\MadelineProto\APIWrapper $api)
     {
         parent::__construct($api);
-        yield $this->eh->echo("EventHandler::onStart executed!" . PHP_EOL);
-
         $now = microtime(true);
+
+        sleep(2);
+        Logger::Log("EventHandler::__constructor executed!" . PHP_EOL);
+
         $this->sessionCreated      = $now;
         $this->handlerUnserialized = $now;
         $this->scriptStarted       = SCRIPT_START;
@@ -46,28 +48,23 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->canExecute          = false;
         $this->stopReason          = "UNKNOWN";
 
-        //$userDate = new UserDate($this->robotConfig['zone']);
-        //echo ('EventHandler Created at: ' . $userDate->milli($now) . PHP_EOL);
-
         $this->builtinPlugin = new BuiltinPlugin($this);
         $this->yourPlugin    = new    YourPlugin($this);
     }
 
     public function onStart(): \Generator
     {
-        //yield $this->sleep(2);
-        yield $this->echo('EventHandler::onStart executed.' . PHP_EOL);
+        yield $this->sleep(2);
         yield $this->logger('EventHandler::onStart executed.', Logger::ERROR);
         //$this->userDate = new UserDate($this->robotConfig['zone']);
         //$e = new \Exception;
         //yield $this->echo($e->getTraceAsString($e) . PHP_EOL);
-        //yield $this->echo('onStart executed.' . PHP_EOL);
 
         if (method_exists('BuiltinPlugin', 'onStart')) {
-            yield $this->builtinPlugin->onStart();
+            yield $this->builtinPlugin->onStart($this);
         }
         if (method_exists('YouPlugin', 'onStart')) {
-            yield $this->yourPlugin->onStart();
+            yield $this->yourPlugin->onStart($this);
         }
     }
 
@@ -84,25 +81,17 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
         $vars = computeVars($update, $this);
 
-        yield $this->builtinPlugin->handleEvent($update, $vars);
-        yield $this->yourPlugin->handleEvent($update, $vars);
+        yield ($this->builtinPlugin)($update, $vars, $this);
+        yield ($this->yourPlugin)($update, $vars, $this);
     }
 
-    //public function __sleep()
-    //{
-    //    //echo ('EventHandler Sleep called.' . PHP_EOL);
-    //    return ['sessionCreated', 'robotId', 'robotConfig'];
-    //}
     public function __wakeup()
     {
         $this->scriptStarted       = SCRIPT_START;
         $this->handlerUnserialized = microtime(true);
         $this->canExecute          = false;
         $this->stopReason          = "UNKNOWN";
-
-        echo ('EventHandler restarted.' . PHP_EOL);
-        //$this->builtinPlugin = new BuiltinPlugin($this);
-        //$this->yourPlugin    = new    YourPlugin($this);
+        Logger::log('EventHandler restarted.', Logger::ERROR);
     }
 
     public function setRobotConfig(array $robotConfig)

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-class YourPlugin
+class YourPlugin extends AbstractPlugin implements Plugin
 {
     private BaseEventHandler $eh;
 
@@ -11,15 +11,18 @@ class YourPlugin
         $this->eh = $eh;
     }
 
-    public function onStart(): \Generator
+    public function onStart(BaseEventHandler $eh): \Generator
     {
         return;
         yield;
     }
 
-    public function handleEvent(array $update, array $vars): \Generator
+    public function __invoke(array $update, array $vars, BaseEventHandler $eh): \Generator
     {
-        return;
+        // Handle $update.  Use $vars if necessary
+        // .....
+
+        return false; // return true if $update is handled.
         yield;
     }
 }
