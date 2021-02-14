@@ -8,9 +8,10 @@ define('SCRIPT_START', microtime(true));
 define('SCRIPT_INFO',  'BASE_P V0.1.0'); // <== Do not change!
 require_once 'functions.php';
 includeMadeline('phar');
-$robotConfig = include('config.php');
-$userDate = new \UserDate($robotConfig['zone']);
-echo ('Script started at: ' . $userDate->format(SCRIPT_START) . PHP_EOL);
+define('ROBOT_CONFIG', include('config.php'));
+initPhp();
+$userDate = new \UserDate(ROBOT_CONFIG['zone']);
+error_log('Script started at: ' . $userDate->format(SCRIPT_START) . '<br>');
 
 require_once         'plugins/Plugin.php';
 require_once 'plugins/AbstractPlugin.php';
@@ -19,6 +20,10 @@ require_once     'plugins/YourPlugin.php';
 
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {
+    //use \danog\Serializable;
+
+    static array $robotConfig1;
+
     private BuiltinPlugin $builtinPlugin;
     private    YourPlugin $yourPlugin;
 
@@ -33,13 +38,15 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     private bool     $canExecute;
     private string   $stopReason;
 
-    function __construct(\danog\MadelineProto\APIWrapper $api)
+    function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
-        parent::__construct($api);
+        parent::__construct($apiWrapper);
+        Logger::log(toJSON(ROBOT_CONFIG));
         $now = microtime(true);
 
         sleep(2);
-        Logger::Log("EventHandler::__constructor executed!" . PHP_EOL);
+        $userDate = new \UserDate(ROBOT_CONFIG['zone']);
+        Logger::Log("EventHandler instantiated at " . $userDate->format($now), Logger::ERROR);
 
         $this->sessionCreated      = $now;
         $this->handlerUnserialized = $now;
@@ -52,10 +59,27 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->yourPlugin    = new    YourPlugin($this);
     }
 
+    public function __wakeup()
+    {
+        $this->scriptStarted       = SCRIPT_START;
+        $now = microtime(true);
+        $this->handlerUnserialized = $now;
+        $userDate = new \UserDate(ROBOT_CONFIG['zone']);
+        Logger::log('EventHandler unserialized at ' . $userDate->format($now), Logger::ERROR);
+
+        $this->canExecute          = false;
+        $this->stopReason          = "UNKNOWN";
+        //Logger::log(toJSON(ROBOT_CONFIG), Logger::ERROR);
+    }
+
     public function onStart(): \Generator
     {
-        yield $this->sleep(2);
-        yield $this->logger('EventHandler::onStart executed.', Logger::ERROR);
+        $robotConfig = $this->__get('configuration');
+        if ($robotConfig) {
+            echo (toJSON($robotConfig) . PHP_EOL);
+        }
+        $start = $this->formatTime(microtime(true));
+        yield $this->logger("EventHandler::onStart executed at $start", Logger::ERROR);
         //$this->userDate = new UserDate($this->robotConfig['zone']);
         //$e = new \Exception;
         //yield $this->echo($e->getTraceAsString($e) . PHP_EOL);
@@ -81,17 +105,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
         $vars = computeVars($update, $this);
 
-        yield ($this->builtinPlugin)($update, $vars, $this);
-        yield ($this->yourPlugin)($update, $vars, $this);
-    }
-
-    public function __wakeup()
-    {
-        $this->scriptStarted       = SCRIPT_START;
-        $this->handlerUnserialized = microtime(true);
-        $this->canExecute          = false;
-        $this->stopReason          = "UNKNOWN";
-        Logger::log('EventHandler restarted.', Logger::ERROR);
+        $processed = yield ($this->builtinPlugin)($update, $vars, $this);
+        $processed = yield ($this->yourPlugin)($update, $vars, $this);
     }
 
     public function setRobotConfig(array $robotConfig)
@@ -194,21 +209,28 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         return $this->handlerUnserialized;
     }
+
+    function getSession(): string
+    {
+        return \basename($this->session);
+    }
 }
 
-$session  = $robotConfig['mp'][0]['session'];
-$settings = $robotConfig['mp'][0]['settings'];
+$session  = ROBOT_CONFIG['mp'][0]['session'];
+$settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new \danog\MadelineProto\API($session, $settings);
 $authState = authorizationState($mp);
-echo ("Authorization State: " . authorizationStateDesc($authState) . PHP_EOL);
+error_log("<br>Authorization State: " . authorizationStateDesc($authState) . '<br>' . PHP_EOL);
 if ($authState === 4) {
-    echo (PHP_EOL . "Invalid App, or the Session is corrupted!" . PHP_EOL . PHP_EOL);
+    echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
 }
-echo ("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false') . PHP_EOL);
+error_log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false') . '<br>' . PHP_EOL);
+$mp->__set('configuration', ROBOT_CONFIG);
 
-safeStartAndLoop($mp, BaseEventHandler::class, $robotConfig);
-$mp->loop();
-echo ('Bye, bye!');
+safeStartAndLoop($mp, BaseEventHandler::class, ROBOT_CONFIG);
+
+echo ('Bye, bye!<br>' . PHP_EOL);
+error_log('Bye, bye!<br>');
 
 
 function robotName(array $user): array

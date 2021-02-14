@@ -2,19 +2,29 @@
 
 declare(strict_types=1);
 
-\date_default_timezone_set('UTC');
-\ignore_user_abort(true);
-\error_reporting(E_ALL);                                 // always TRUE
-ini_set('max_execution_time',     '0');
-ini_set('ignore_repeated_errors', '1');                 // always TRUE
-ini_set('display_startup_errors', '1');
-ini_set('display_errors',         '1');                 // FALSE only in production or real server
-ini_set('log_errors',             '1');                 // Error logging engine
-ini_set('error_log',              'MadelineProto.log'); // Logging file path
-ini_set('precision',              '18');
+function initPhp(): void
+{
+    \date_default_timezone_set('UTC');
+    \ignore_user_abort(true);
+    \error_reporting(E_ALL);                                 // always TRUE
+    ini_set('max_execution_time',     '0');
+    ini_set('ignore_repeated_errors', '1');                 // always TRUE
+    ini_set('display_startup_errors', '1');
+    ini_set('display_errors',         '1');                 // FALSE only in production or real server
+    ini_set('default_charset',        'UTF-8');
+    ini_set('precision',              '18');
+    ini_set('log_errors',             '1');                 // Error logging engine
+    ini_set('error_log',              'MadelineProto.log'); // Logging file path
+}
+
+error_log("TEST TEST TEST");
+// $server_root = realpath($_SERVER["DOCUMENT_ROOT"]);
+// $config_serv = "$server_root/php/config.php";
+// include("$config_serv");
 
 return [
-    'admins'   => [],
+    'admins'     => [],
+    //'ownerid'  => 1234,
     //'officeid' => 1234,
     //'host'     => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
     'zone'     => 'Asia/Tehran',

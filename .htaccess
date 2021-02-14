@@ -1,0 +1,62 @@
+<IfModule Litespeed>
+    RewriteEngine On
+    RewriteRule .* - [E=noconntimeout:1]
+    RewriteRule .* - [E=noabort:1]
+</IfModule>
+
+php_flag  display_startup_errors on
+php_flag  display_errors on
+php_flag  html_errors on
+php_flag  log_errors on
+php_value max_input_time -1
+php_value max_execution_time 0
+#php_value memory_limit 256M
+#php_value upload_max_filesize 64M
+#php_value post_max_size 64M
+#php_value max_input_time 1000
+#php_value error_log  /home/u176105864/domains/tlgbots.com/public_html/plugbase/PHP_errors.log
+
+# Uncomment the following three lines for Hostinger
+SecFilterEngine   Off
+SecFilterScanPOST Off
+Header always set Content-Security-Policy: upgrade-insecure-requests
+
+RewriteEngine on
+RewriteRule .* - [E=noconntimeout:1]
+RewriteRule .* - [E=noabort:1]
+#RewriteCond %{HTTPS} off
+#RewriteCond %{HTTP_HOST} (www\.)?tab.tlgbots.com
+#RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+#-----------------------------------------------------------------------------------
+
+#Bestela Apache
+AddDefaultCharset UTF-8 
+
+SetEnv noabort 1
+#RewriteRule .* - [E=noabort:1]
+#RewriteRule .* - [E=noconntimeout:1]
+
+#php_value max_execution_time 0
+php_value set_time_limit 0
+php_value display_errors 1
+php_value display_startup_errors 1
+php_value ignore_repeated_errors 1      
+php_value log_errors 1    
+php_value date.timezone 'UTC'
+php_flag ignore_user_abort 1
+
+#Options All -Indexes
+#<IfModule mime_module>
+#  AddHandler application/x-httpd-ea-php73 .php .php7 .phtml
+#</IfModule>
+
+#<IfModule mod_litespeed.c>
+#    litespeed stuff here
+#</IfModule>
+
+#<IfModule litespeed>
+# litespeed stuff here
+#</IfModule>
+
+#php_admin_value max_execution_time 1000

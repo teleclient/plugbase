@@ -57,10 +57,28 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
     {
         $this->totalUpdates += 1;
 
-        if (!hasText($update) || !oneOf($update, 'NewMessage')) {
+        if (!($vars['fromRobot'] && $vars['toRobot']) && !($vars['fromAdmin'] && $vars['toOffice'])) {
             return false;
         }
-        if (!($vars['fromRobot'] && $vars['toRobot']) && !($vars['fromAdmin'] && $vars['toOffice'])) {
+
+        //Function: Finnish executing the Stop command.
+        if ($vars['msgText'] === 'Robot is stopping ...') {
+            if (Shutdown::removeCallback('restarter')) {
+                yield $eh->logger('Self-Restarter disabled.', Logger::ERROR);
+            }
+            yield $eh->logger('Robot stopped at ' . date('d H:i:s!'), Logger::ERROR);
+            yield $eh->stop();
+            return true;
+        }
+
+        //Function: Finnish executing the Restart command.
+        if ($vars['msgText'] === 'Robot is restarting ...') {
+            yield $eh->logger('Robot restarted at ' . date('d H:i:s!'), Logger::ERROR);
+            yield $eh->restart();
+            return true;
+        }
+
+        if (!hasText($update) || $update['_'] !== 'updateNewMessage') {
             return false;
         }
         if (!isset($vars['msgText'][0]) || strpos($vars['prefixes'], $vars['msgText'][0]) === false) {
@@ -183,7 +201,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                     }
                 );
                 $stats  = '<b>STATISTICS</b>  (Script: ' . SCRIPT_INFO . ')<br>';
-                $stats .= "Robot Account: $eh->getRobotName()<br>";
+                $stats .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $stats .= "Total Dialogs: $totalDialogsOut<br>";
                 $stats .= "Users: {$peerCounts['user']}<br>";
                 $stats .= "Bots: {$peerCounts['bot']}<br>";
@@ -248,7 +266,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                     break;
                 }
                 yield $eh->logger('The robot re-started by the owner.', Logger::ERROR);
-                $text = 'Restarting the robot ...';
+                $text = 'Robot is restarting ...';
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->setStopReason('restart');
                 $eh->restart();
@@ -262,23 +280,16 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
             case 'stop':
                 $text = 'Robot is stopping ...';
                 yield respond($eh, $peer, $msgId, $text);
-                yield $eh->logger($text . 'at ' . date('d H:i:s!'), Logger::ERROR);
-                $eh->setStopReason($verb);
+                yield $eh->logger($text, Logger::ERROR);
+                if ($verb === 'stop') {
+                    $eh->setStopReason($verb);
+                }
                 break;
             default:
                 $text = "Invalid command: '$msgText'";
                 yield respond($eh, $peer, $msgId, $text);
                 break;
         } // enf of the command switch
-
-        //Function: Finnish executing the Stop command.
-        if ($fromRobot && $msgText === 'Robot is stopping ...') {
-            if (Shutdown::removeCallback('restarter')) {
-                yield $eh->logger('Self-Restarter disabled.', Logger::ERROR);
-            }
-            yield $eh->logger('Robot stopped at ' . date('d H:i:s!'), Logger::ERROR);
-            yield $eh->stop();
-        }
     }
 
     public function getNotif(): string

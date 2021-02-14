@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-class AbstractPlugin
+abstract class AbstractPlugin
 {
     function __construct(BaseEventHandler $eh)
     {

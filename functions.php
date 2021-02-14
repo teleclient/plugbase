@@ -435,9 +435,11 @@ function authorizationStateDesc(int $authorized): string
     }
 }
 
-function respond(object $eh, array $peer, int $msgId, string $text): \Generator
+function respond(object $eh, array $peer, int $msgId, string $text, bool $edit = null): \Generator
 {
-    if ($eh->getEditMessage()) {
+    $edit = $edit ?? $eh->getEditMessage();
+
+    if ($edit) {
         $result = yield $eh->messages->editMessage([
             'peer'       => $peer,
             'id'         => $msgId,
