@@ -218,8 +218,8 @@ $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new \danog\MadelineProto\API($session, $settings);
 $mp->updateSettings(['logger_level' => \danog\MadelineProto\Logger::ERROR]);
-$stngs = $mp->getSettings();
-Logger::log(toJSON($stngs['app_info']), Logger::ERROR);
+//$stngs = $mp->getSettings();
+//Logger::log(toJSON($stngs['app_info']), Logger::ERROR);
 
 $authState = authorizationState($mp);
 error_log("Authorization State: " . authorizationStateDesc($authState));
