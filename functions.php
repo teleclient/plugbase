@@ -650,8 +650,7 @@ function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, ar
             try {
                 $started = false;
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
-                    echo ("Not Logged-in!" . PHP_EOL);
-                    //throw new \ErrorException("Not Logged-in!", \danog\madelineproto\Logger::FATAL_ERROR);
+                    yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 }
                 $me = yield $mp->start();
                 if (!$me || !is_array($me)) {

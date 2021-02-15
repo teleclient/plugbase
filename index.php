@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use danog\madelineproto\Logger;
 
-initPhp();
 define('SCRIPT_START', microtime(true));
 define('SCRIPT_INFO',  'BASE_P V0.1.0'); // <== Do not change!
 require_once 'functions.php';
+initPhp();
 includeMadeline('phar');
 define('ROBOT_CONFIG', include('config.php'));
 $userDate = new \UserDate(ROBOT_CONFIG['zone']);
