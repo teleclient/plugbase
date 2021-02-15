@@ -217,7 +217,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new \danog\MadelineProto\API($session, $settings);
-$mp->updateSettings(['logger_level' => \danog\MadelineProto\Logger::ERROR]);
+$mp->updateSettings(['logger_level' => Logger::NOTICE]);
 //$stngs = $mp->getSettings();
 //Logger::log(toJSON($stngs['app_info']), Logger::ERROR);
 
