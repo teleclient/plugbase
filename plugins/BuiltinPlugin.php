@@ -60,22 +60,35 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
         if (!($vars['fromRobot'] && $vars['toRobot']) && !($vars['fromAdmin'] && $vars['toOffice'])) {
             return false;
         }
-
-        //Function: Finnish executing the Stop command.
-        if ($vars['msgText'] === 'Robot is stopping ...') {
-            if (Shutdown::removeCallback('restarter')) {
-                yield $eh->logger('Self-Restarter disabled.', Logger::ERROR);
-            }
-            yield $eh->logger('Robot stopped at ' . date('d H:i:s!'), Logger::ERROR);
-            yield $eh->stop();
-            return true;
+        if (!oneOf($update, 'NewMessage|EditMessage') || !hasText($update)) {
+            return false;
         }
 
-        //Function: Finnish executing the Restart command.
-        if ($vars['msgText'] === 'Robot is restarting ...') {
-            yield $eh->logger('Robot restarted at ' . date('d H:i:s!'), Logger::ERROR);
-            yield $eh->restart();
-            return true;
+        if ($eh->newMessage($update)) {
+
+            //Function: Finnish executing the Stop command.
+            if ($vars['msgText'] === 'Robot is stopping ...') {
+                if (Shutdown::removeCallback('restarter')) {
+                    yield $eh->logger('Self-Restarter disabled.', Logger::ERROR);
+                }
+                yield $eh->logger('Robot stopped at ' . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->stop();
+                return true;
+            }
+
+            //Function: Finnish executing the Restart command.
+            if ($vars['msgText'] === 'Robot is restarting ...') {
+                yield $eh->logger('Robot restarted at ' . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->restart();
+                return true;
+            }
+
+            //Function: Finnish executing the Logout command.
+            if ($vars['msgText'] === 'Robot is logging out ...') {
+                yield $eh->logger('Robot logged out at ' . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logout();
+                return true;
+            }
         }
 
         if (!hasText($update) || $update['_'] !== 'updateNewMessage') {
@@ -265,25 +278,24 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                     yield $eh->logger("Command '/restart' is only avaiable under webservers. Ignored!  " . date('d H:i:s!'), Logger::ERROR);
                     break;
                 }
-                yield $eh->logger('The robot re-started by the owner.', Logger::ERROR);
                 $text = 'Robot is restarting ...';
+                yield $eh->logger($text, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->setStopReason('restart');
-                $eh->restart();
+                //$eh->restart();
                 break;
             case 'logout':
-                yield $eh->logger('the robot is logged out by the owner.', Logger::ERROR);
-                $text = 'The robot is logging out. ...';
+                $text = 'Robot is logging out ...';
+                yield $eh->logger($text, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->setStopReason('logout');
-                $eh->logout();
+                //$eh->logout();
+                break;
             case 'stop':
                 $text = 'Robot is stopping ...';
                 yield respond($eh, $peer, $msgId, $text);
                 yield $eh->logger($text, Logger::ERROR);
-                if ($verb === 'stop') {
-                    $eh->setStopReason($verb);
-                }
+                $eh->setStopReason($verb);
                 break;
             default:
                 $text = "Invalid command: '$msgText'";

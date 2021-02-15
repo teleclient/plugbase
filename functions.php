@@ -580,6 +580,21 @@ function hasText(array $update): bool
         $update['message']['_'] !== 'messageService' && $update['message']['_'] !== 'messageEmpty';
 }
 
+function initPhp(): void
+{
+    \date_default_timezone_set('UTC');
+    \ignore_user_abort(true);
+    \set_time_limit(0);
+    \error_reporting(E_ALL);                                 // always TRUE
+    ini_set('ignore_repeated_errors', '1');                 // always TRUE
+    ini_set('display_startup_errors', '1');
+    ini_set('display_errors',         '1');                 // FALSE only in production or real server
+    ini_set('default_charset',        'UTF-8');
+    ini_set('precision',              '18');
+    ini_set('log_errors',             '1');                 // Error logging engine
+    ini_set('error_log',              'MadelineProto.log'); // Logging file path
+}
+
 function myStartAndLoop(\danog\madelineproto\API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
 {
     $maxRecycles  = 10;

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use danog\madelineproto\Logger;
 
+initPhp();
 define('SCRIPT_START', microtime(true));
 define('SCRIPT_INFO',  'BASE_P V0.1.0'); // <== Do not change!
 require_once 'functions.php';
 includeMadeline('phar');
 define('ROBOT_CONFIG', include('config.php'));
-initPhp();
 $userDate = new \UserDate(ROBOT_CONFIG['zone']);
 error_log('Script started at: ' . $userDate->format(SCRIPT_START) . '<br>');
 
@@ -61,14 +61,14 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function __wakeup()
     {
-        $this->scriptStarted       = SCRIPT_START;
+        $this->scriptStarted  = SCRIPT_START;
         $now = microtime(true);
         $this->handlerUnserialized = $now;
         $userDate = new \UserDate(ROBOT_CONFIG['zone']);
         Logger::log('EventHandler unserialized at ' . $userDate->format($now), Logger::ERROR);
 
-        $this->canExecute          = false;
-        $this->stopReason          = "UNKNOWN";
+        $this->canExecute = false;
+        $this->stopReason = "UNKNOWN";
         //Logger::log(toJSON(ROBOT_CONFIG), Logger::ERROR);
     }
 
@@ -95,9 +95,9 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     public function onAny(array $update): \Generator
     {
         if (
-            !$this->canExecute &&
-            $update['_'] === 'updateNewMessage' &&
-            $update['message']['date'] > intval(SCRIPT_START)
+            !$this->canExecute && $this->newMessage($update)
+            //oneOf($update, 'NewMessage|EditMessage') &&
+
         ) {
             $this->canExecute = true;
             yield $this->logger('Command-Processing engine started at ' . date('d H:i:s'), Logger::ERROR);
@@ -201,6 +201,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         return $this->sessionCreated ?? 0;
     }
+
     function getScriptStarted(): float
     {
         return $this->scriptStarted;
@@ -214,11 +215,20 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         return \basename($this->session);
     }
+
+    function newMessage(array $update): bool
+    {
+        $msgDate    = $update['message']['date'] ?? 0;
+        $newMessage = $msgDate >= intval($this->scriptStarted);
+        return $newMessage;
+    }
 }
 
 $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new \danog\MadelineProto\API($session, $settings);
+//$prevSettings = $mp->getSettings();
+$mp->updateSettings(['logger_level' => \danog\MadelineProto\Logger::NOTICE]);
 $authState = authorizationState($mp);
 error_log("<br>Authorization State: " . authorizationStateDesc($authState) . '<br>' . PHP_EOL);
 if ($authState === 4) {
@@ -231,17 +241,3 @@ safeStartAndLoop($mp, BaseEventHandler::class, ROBOT_CONFIG);
 
 echo ('Bye, bye!<br>' . PHP_EOL);
 error_log('Bye, bye!<br>');
-
-
-function robotName(array $user): array
-{
-    $name = strval($user['id']);
-    if (isset($user['username'])) {
-        $name = $user['username'];
-    } elseif (isset($user['first_name'])) {
-        $name = $user['first_name'];
-    } elseif (isset($user['last_name'])) {
-        $name = $user['last_name'];
-    }
-    return $name;
-}
