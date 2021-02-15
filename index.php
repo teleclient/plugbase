@@ -20,8 +20,6 @@ require_once     'plugins/YourPlugin.php';
 
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {
-    //use \danog\Serializable;
-
     static array $robotConfig1;
 
     private BuiltinPlugin $builtinPlugin;
@@ -29,7 +27,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     private float $sessionCreated;
     private float $scriptStarted;
-    private float $handlerUnserialized; // $sessionRestarted?
+    private float $handlerUnserialized;
 
     private array    $robotConfig;
     private int      $robotId;
@@ -69,7 +67,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
         $this->canExecute = false;
         $this->stopReason = "UNKNOWN";
-        //Logger::log(toJSON(ROBOT_CONFIG), Logger::ERROR);
     }
 
     public function onStart(): \Generator
@@ -80,9 +77,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         }
         $start = $this->formatTime(microtime(true));
         yield $this->logger("EventHandler::onStart executed at $start", Logger::ERROR);
-        //$this->userDate = new UserDate($this->robotConfig['zone']);
-        //$e = new \Exception;
-        //yield $this->echo($e->getTraceAsString($e) . PHP_EOL);
 
         if (method_exists('BuiltinPlugin', 'onStart')) {
             yield $this->builtinPlugin->onStart($this);
@@ -94,11 +88,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function onAny(array $update): \Generator
     {
-        if (
-            !$this->canExecute && $this->newMessage($update)
-            //oneOf($update, 'NewMessage|EditMessage') &&
-
-        ) {
+        if (!$this->canExecute && $this->newMessage($update)) {
             $this->canExecute = true;
             yield $this->logger('Command-Processing engine started at ' . date('d H:i:s'), Logger::ERROR);
         }
