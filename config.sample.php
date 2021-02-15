@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-error_log("TEST TEST TEST");
 // $server_root = realpath($_SERVER["DOCUMENT_ROOT"]);
 // $config_serv = "$server_root/php/config.php";
 // include("$config_serv");
