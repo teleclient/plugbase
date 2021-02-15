@@ -227,17 +227,19 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new \danog\MadelineProto\API($session, $settings);
-//$prevSettings = $mp->getSettings();
-$mp->updateSettings(['logger_level' => \danog\MadelineProto\Logger::NOTICE]);
+$mp->updateSettings(['logger_level' => \danog\MadelineProto\Logger::ERROR]);
+$stngs = $mp->getSettings();
+Logger::log(toJSON($stngs));
+
 $authState = authorizationState($mp);
-error_log("<br>Authorization State: " . authorizationStateDesc($authState) . '<br>' . PHP_EOL);
+error_log("Authorization State: " . authorizationStateDesc($authState));
 if ($authState === 4) {
     echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
+    Logger::log(PHP_EOL . "Invalid App, or the Session is corrupted!", Logger::ERROR);
 }
-error_log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false') . '<br>' . PHP_EOL);
-$mp->__set('configuration', ROBOT_CONFIG);
+error_log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'));
 
 safeStartAndLoop($mp, BaseEventHandler::class, ROBOT_CONFIG);
 
 echo ('Bye, bye!<br>' . PHP_EOL);
-error_log('Bye, bye!<br>');
+error_log('Bye, bye!');

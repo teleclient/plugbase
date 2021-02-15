@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#lsphp:ns/tlgbots.com/public_html/plugbase/index.php
+
 pkill index
 
 #kill $(pgrep index)

@@ -656,7 +656,6 @@ function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, ar
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
-                yield $mp->logger("Robot Id: {$me['id']}", Logger::ERROR);
                 yield $mp->setEventHandler($eventHandler);
                 $eh = $mp->getEventHandler($eventHandler);
                 $eh->setSelf($me);

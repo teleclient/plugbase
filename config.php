@@ -29,7 +29,7 @@ return [
                 ],
                 'logger' => [
                     'logger'       => \danog\MadelineProto\Logger::FILE_LOGGER,
-                    'logger_level' => \danog\MadelineProto\Logger::NOTICE,
+                    'logger_level' => \danog\MadelineProto\Logger::ERROR,
                 ],
                 'peer' => [
                     //'full_info_cache_time' => 60,
