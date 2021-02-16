@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
+use function\Amp\File\{get, put, exists, getSize};
 
 function toJSON($var, bool $pretty = true): ?string
 {
@@ -34,6 +35,22 @@ function parseCommand(array $update, string $prefixes = '!/', int $maxParams = 3
         }
     }
     return $command;
+}
+
+function getWebServerName(): ?string
+{
+    return $_SERVER['SERVER_NAME'] ?? null;
+}
+function setWebServerName(string $serverName): void
+{
+    if ($serverName !== '') {
+        $_SERVER['SERVER_NAME'] = $serverName;
+    }
+}
+
+function getUserAgent(): ?string
+{
+    return $_SERVER['HTTP_USER_AGENT'] ?? null;
 }
 
 function logit(string $entry, object $api = null, int $level = \danog\madelineproto\Logger::NOTICE): \Generator
@@ -100,71 +117,173 @@ function computeVars(array $update, object $eh): array
     return $vars;
 }
 
-function milliDate(string $zone, float $time = null, string $format = 'H:i:s.v'): string
+
+function appendLaunchRecord(object $eh, string $fileName, float $scriptStartTime, string $launchMethod, string $stopReason, int $peakMemory): array
 {
-    $time   = $time ?? \microtime(true);
-    $zoneObj = new \DateTimeZone($zone);
-    $dateObj = \DateTimeImmutable::createFromFormat('U.u', number_format($time, 6, '.', ''));
-    $dateObj->setTimeZone($zoneObj);
-    return $dateObj->format($format);
+    $record['time_start']    = $scriptStartTime;
+    $record['time_end']      = 0;
+    $record['launch_method'] = $launchMethod; // \getLaunchMethod();
+    $record['stop_reason']   = $stopReason;
+    $record['memory_start']  = $peakMemory; // \getPeakMemory();
+    $record['memory_end']    = 0;
+
+    $line = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_end']}";
+    file_put_contents($fileName, "\n" . $line, FILE_APPEND | LOCK_EX);
+    //yield \Amp\File\put($fileName, "\n" . $line);
+
+    return $record;
 }
 
-class UserDate
+function updateLaunchRecord(string $fileName, float $scriptStartTime, float $scriptEndTime, string $stopReason, int $peakMemory): array
 {
-    private \DateTimeZone $timeZoneObj;
-
-    function __construct(string $zone)
-    {
-        $this->timeZoneObj = new \DateTimeZone($zone);
+    $record = null;
+    $new    = null;
+    $lines = file($fileName);
+    //$lines  = yield Amp\File\get($fileName);
+    $key    = $scriptStartTime . ' ';
+    $content = '';
+    foreach ($lines as $line) {
+        if (strStartsWith($line, $key)) {
+            $items = explode(' ', $line);
+            $record['time_start']    = intval($items[0]); // $scriptStartTime
+            $record['time_end']      = $scriptEndTime;
+            $record['launch_method'] = $items[2]; // \getLaunchMethod();
+            $record['stop_reason']   = $stopReason;
+            $record['memory_start']  = intval($items[4]);
+            $record['memory_end']    = $peakMemory; // \getPeakMemory();
+            $new = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_end']}";
+            $content .= $new . "\n";
+        } else {
+            $content .= $line;
+        }
     }
-
-    public function getZone(): string
-    {
-        return $this->timeZoneObj->getName();
+    if ($new === null) {
+        throw new \ErrorException("Launch record not found! key: $scriptStartTime");
     }
+    file_put_contents($fileName, rtrim($content));
+    //yield Amp\File\put($fileName, rtrim($content));
+    return $record;
+}
 
-    public function format(float $microtime = null, string $format = 'H:i:s.v'): string
-    {
-        $microtime = $microtime ?? \microtime(true);
-
-        $datetime = DateTime::createFromFormat('U.u', number_format($microtime, 6, '.', ''));
-        $datetime->setTimeZone($this->timeZoneObj);
-        return $datetime->format($format);
-
-        $dateObj = \DateTimeImmutable::createFromFormat('U.u', number_format($microtime, 6, '.', ''));
-        $dateObj = $dateObj->setTimeZone($this->timeZoneObj);
-        return $dateObj->format($format);
+function getPreviousLaunch(object $eh, string $fileName, float $scriptStartTime): \Generator
+{
+    $content = yield get($fileName);
+    if ($content === '') {
+        return null;
     }
-
-    function mySqlmicro(float $time = null, $format = 'Y-m-d H:i:s.u'): string
-    {
-        $time  = $time ?? \microtime(true);
-
-        $dateObj = \DateTimeImmutable::createFromFormat('U.u', number_format($time, 6, '.', ''));
-        $dateObj = $dateObj->setTimeZone($this->timeZoneObj);
-        return $dateObj->format($format);
+    $content = substr($content, 1);
+    $lines = explode("\n", $content);
+    yield $eh->logger("Launches Count:" . count($lines), Logger::ERROR);
+    $record = null;
+    $key = strval($scriptStartTime) . ' ';
+    foreach ($lines as $line) {
+        if (strStartsWith($line, $key)) {
+            break;
+        }
+        $record = $line;
     }
-
-    function duration(float $start, float $end = null): string
-    {
-        $end = $end ?? \microtime(true);
-        $diff = $end - $start;
-
-        // Break the difference into seconds and microseconds
-        $secs = intval($diff);
-        $micro = $diff - $secs;
-
-        // $final will contain something like "00:00:02.452"
-        //$final = strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
-        //return $final;
-
-        $days    = floor($secs  / 86400);
-        $hours   = floor(($secs / 3600) % 3600);
-        $minutes = floor(($secs / 60) % 60);
-        $seconds = $secs % 60;
-        $ageStr  = sprintf("%02d:%02d:%02d:%02d", $days, $hours, $minutes, $seconds) . str_replace('0.', '.', sprintf('%.3f', $micro));
-        return $ageStr;
+    if ($record === null) {
+        return null;
     }
+    $fields = explode(' ', trim($record));
+    if (count($fields) !== 6) {
+        throw new \ErrorException("Invalid launch information .");
+    }
+    $launch['time_start']    = intval($fields[0]);
+    $launch['time_end']      = intval($fields[1]);
+    $launch['launch_method'] = $fields[2];
+    $launch['stop_reason']   = $fields[3];
+    $launch['memory_start']  = intval($fields[4]);
+    $launch['memory_end']    = intval($fields[5]);
+    return $launch;
+}
+
+/*
+  Interface, LaunchMethod
+1) Web, Manual
+2) Web, Cron
+3) Web, Restart
+4) CLI, Manual
+5) CLI, Cron
+*/
+function getLaunchMethod(): string
+{
+    if (PHP_SAPI === 'cli') {
+        $interface = 'cli';
+        if (PHP_OS_FAMILY === "Linux") {
+            if ($_SERVER['TERM']) {
+                $launchMethod = 'manual';
+            } else {
+                $launchMethod = 'cron';
+            }
+        } elseif (PHP_OS_FAMILY === "Windows") {
+            $launchMethod = 'manual';
+        } else {
+            throw new Exception('Unknown OS!');
+        }
+    } else {
+        $interface    = 'web';
+        $launchMethod = 'UNKNOWN';
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $requestUri = htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8');
+            if (stripos($requestUri, '?MadelineSelfRestart=') !== false) {
+                $launchMethod = 'restart';
+            } else if (stripos($requestUri, 'cron') !== false) {
+                $launchMethod = 'cron';
+            } else {
+                $launchMethod = 'manual';
+            }
+        }
+    }
+    return $launchMethod;
+}
+
+function getRequestURL(): ?string
+{
+    //$_SERVER['REQUEST_URI'] => '/base/?MadelineSelfRestart=1755455420394943907'
+    $url = null;
+    if (PHP_SAPI !== 'cli') {
+        $url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+        $url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+    }
+    return $url;
+}
+
+
+function makeDataDirectory($directory): string
+{
+    if (file_exists($directory)) {
+        if (!is_dir($directory)) {
+            throw new \ErrorException('data folder already exists as a file');
+        }
+    } else {
+        mkdir($directory);
+    }
+    $dataDirectory = realpath($directory);
+    return $dataDirectory;
+}
+
+function makeDataFile($dataDirectory, $dataFile): string
+{
+    $fullPath = $dataDirectory . '/' . $dataFile;
+    if (!file_exists($fullPath)) {
+        \touch($fullPath);
+    }
+    $real = realpath('data/' . $dataFile);
+    return $fullPath;
+}
+
+function makeWebServerName(): ?string
+{
+    $webServerName = null;
+    if (PHP_SAPI !== 'cli') {
+        $webServerName = getWebServerName();
+        if (!$webServerName) {
+            echo ("To enable the restart, the constant SERVER_NAME must be defined!" . PHP_EOL);
+            $webServerName = '';
+        }
+    }
+    return $webServerName;
 }
 
 function resolveDialog($mp, array $dialog, array $messages, array $chats, array $users)
@@ -475,18 +594,6 @@ function getFileSize(string $file): int
     return $sessionSize;
 }
 
-function computeDuration(float $start, float $end = null): string
-{
-    $end = $end ?? \microtime(true);
-    $age     = intval($end - $start); // seconds
-    $days    = floor($age  / 86400);
-    $hours   = floor(($age / 3600) % 3600);
-    $minutes = floor(($age / 60) % 60);
-    $seconds = $age % 60;
-    $ageStr  = sprintf("%02d:%02d:%02d:%02d", $days, $hours, $minutes, $seconds);
-    return $ageStr;
-}
-
 function hostName(bool $full = false): string
 {
     $name = \getHostname();
@@ -549,15 +656,6 @@ function getCurrentMemory(): int
     return $mem;
 }
 
-/*
-function getSizeString(int $size): string
-{
-    $unit = array('Bytes', 'KB', 'MB', 'GB', 'TB', 'PB');
-    $mem  = $size !== 0 ? round($size / pow(1024, ($x = floor(log($size, 1024)))), 2) . ' ' . $unit[$x] : 'UNAVAILABLE';
-    return $mem;
-}
-*/
-
 function formatBytes(int $bytes, int $precision = 2)
 {
     $units = array('B', 'KiB', 'MiB', 'GiB', 'TiB');
@@ -593,6 +691,59 @@ function initPhp(): void
     ini_set('precision',              '18');
     ini_set('log_errors',             '1');                 // Error logging engine
     ini_set('error_log',              'MadelineProto.log'); // Logging file path
+}
+
+function checkTooManyRestartsAsync(object $eh, string $startupFilename): \Generator
+{
+    //$startupFilename = 'data/startups.txt';
+    $startups = [];
+    if (yield exists($startupFilename)) {
+        $startupsText = yield get($startupFilename);
+        $startups = explode('\n', $startupsText);
+    } else {
+        // Create the file
+    }
+    $startupsCount0 = count($startups);
+
+    $nowMilli = nowMilli();
+    $aMinuteAgo = $nowMilli - 60 * 1000;
+    foreach ($startups as $index => $startupstr) {
+        $startup = intval($startupstr);
+        if ($startup < $aMinuteAgo) {
+            unset($startups[$index]);
+        }
+    }
+    $startups[] = strval($nowMilli);
+    $startupsText = implode('\n', $startups);
+    yield put($startupFilename, $startupsText);
+    $restartsCount = count($startups);
+    yield $eh->logger("startups: {now:$nowMilli, count0:$startupsCount0, count1:$restartsCount}", Logger::ERROR);
+    return $restartsCount;
+}
+
+function checkTooManyRestarts(string $startupFilename): int
+{
+    $startups = [];
+    if (\file_exists($startupFilename)) {
+        $startupsText = \file_get_contents($startupFilename);
+        $startups = explode('\n', $startupsText);
+    } else {
+        // Create the file
+    }
+
+    $nowMilli = nowMilli();
+    $aMinuteAgo = $nowMilli - 60 * 1000;
+    foreach ($startups as $index => $startupstr) {
+        $startup = intval($startupstr);
+        if ($startup < $aMinuteAgo) {
+            unset($startups[$index]);
+        }
+    }
+    $startups[] = strval($nowMilli);
+    $startupsText = implode('\n', $startups);
+    \file_put_contents($startupFilename, $startupsText);
+    $restartsCount = count($startups);
+    return $restartsCount;
 }
 
 function myStartAndLoop(\danog\madelineproto\API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void

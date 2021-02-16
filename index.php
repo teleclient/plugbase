@@ -3,223 +3,107 @@
 declare(strict_types=1);
 
 use danog\madelineproto\Logger;
+use danog\madelineproto\Shutdown;
+use \danog\MadelineProto\API;
+use \danog\MadelineProto\Magic;
+use \danog\MadelineProto\Loop\Generic\GenericLoop;
+use Amp\Loop;
+use function\Amp\File\{get, put, exists, getSize};
 
 define('SCRIPT_START', microtime(true));
-define('SCRIPT_INFO',  'BASE_P V0.1.0'); // <== Do not change!
+define('SCRIPT_INFO',  'BASE_P V0.2.0'); // <== Do not change!
+define("SCRIPT_START_TIME", \microtime(true));
+define("MEMORY_LIMIT",      \ini_get('memory_limit'));
+define('REQUEST_URL',       \getRequestURL() ?? '');
+define('USER_AGENT',        \getUserAgent() ?? '');
+define("DATA_DIRECTORY",    \makeDataDirectory('data'));
+define("STARTUPS_FILE",     \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
+define("LAUNCHES_FILE",     \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
+
 require_once 'functions.php';
+require_once 'UserDate.php';
 initPhp();
 includeMadeline('phar');
 define('ROBOT_CONFIG', include('config.php'));
 $userDate = new \UserDate(ROBOT_CONFIG['zone']);
 error_log('Script started at: ' . $userDate->format(SCRIPT_START) . '<br>');
 
-require_once         'plugins/Plugin.php';
-require_once 'plugins/AbstractPlugin.php';
-require_once  'plugins/BuiltinPlugin.php';
-require_once     'plugins/YourPlugin.php';
+$restartsCount = checkTooManyRestarts(LAUNCHES_FILE);
+if ($restartsCount > $config->maxrestarts) {
+    $text = 'More than ' . $config->maxrestarts . ' times restarted within a minute. Permanently shutting down ....';
+    Logger::log($text, Logger::ERROR);
+    Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $dateObj->milli(SCRIPT_START_TIME), Logger::ERROR);
+    exit($text . PHP_EOL);
+}
 
-class BaseEventHandler extends \danog\MadelineProto\EventHandler
-{
-    static array $robotConfig1;
-
-    private BuiltinPlugin $builtinPlugin;
-    private    YourPlugin $yourPlugin;
-
-    private float $sessionCreated;
-    private float $scriptStarted;
-    private float $handlerUnserialized;
-
-    private array    $robotConfig;
-    private int      $robotId;
-    private string   $robotName;
-    private UserDate $userDate;
-    private bool     $canExecute;
-    private string   $stopReason;
-
-    function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
-    {
-        parent::__construct($apiWrapper);
-        Logger::log(toJSON(ROBOT_CONFIG));
-        $now = microtime(true);
-
-        sleep(2);
-        $userDate = new \UserDate(ROBOT_CONFIG['zone']);
-        Logger::Log("EventHandler instantiated at " . $userDate->format($now), Logger::ERROR);
-
-        $this->sessionCreated      = $now;
-        $this->handlerUnserialized = $now;
-        $this->scriptStarted       = SCRIPT_START;
-
-        $this->canExecute          = false;
-        $this->stopReason          = "UNKNOWN";
-
-        $this->builtinPlugin = new BuiltinPlugin($this);
-        $this->yourPlugin    = new    YourPlugin($this);
-    }
-
-    public function __wakeup()
-    {
-        $this->scriptStarted  = SCRIPT_START;
-        $now = microtime(true);
-        $this->handlerUnserialized = $now;
-        $userDate = new \UserDate(ROBOT_CONFIG['zone']);
-        Logger::log('EventHandler unserialized at ' . $userDate->format($now), Logger::ERROR);
-
-        $this->canExecute = false;
-        $this->stopReason = "UNKNOWN";
-    }
-
-    public function onStart(): \Generator
-    {
-        $robotConfig = $this->__get('configuration');
-        if ($robotConfig) {
-            echo (toJSON($robotConfig) . PHP_EOL);
+if (PHP_SAPI !== 'cli') {
+    if (!\getWebServerName()) {
+        \setWebServerName($config->host);
+        if (!\getWebServerName()) {
+            $text = "To enable the restart, the config->host must be defined!";
+            echo ($text . PHP_EOL);
+            error_log($text);
         }
-        $start = $this->formatTime(microtime(true));
-        yield $this->logger("EventHandler::onStart executed at $start", Logger::ERROR);
-
-        if (method_exists('BuiltinPlugin', 'onStart')) {
-            yield $this->builtinPlugin->onStart($this);
-        }
-        if (method_exists('YouPlugin', 'onStart')) {
-            yield $this->yourPlugin->onStart($this);
-        }
-    }
-
-    public function onAny(array $update): \Generator
-    {
-        if (!$this->canExecute && $this->newMessage($update)) {
-            $this->canExecute = true;
-            yield $this->logger('Command-Processing engine started at ' . date('d H:i:s'), Logger::ERROR);
-        }
-
-        $vars = computeVars($update, $this);
-
-        $processed = yield ($this->builtinPlugin)($update, $vars, $this);
-        $processed = yield ($this->yourPlugin)($update, $vars, $this);
-    }
-
-    public function setRobotConfig(array $robotConfig)
-    {
-        $this->robotConfig = $robotConfig;
-    }
-    public function getRobotConfig(): array
-    {
-        return $this->robotConfig;
-    }
-
-    public function setSelf(array $self)
-    {
-        $this->robotId = $self['id'];
-        $name = strval($self['id']);
-        if (isset($self['username'])) {
-            $name = $self['username'];
-        } elseif (isset($self['first_name'])) {
-            $name = $self['first_name'];
-        } elseif (isset($self['last_name'])) {
-            $name = $self['last_name'];
-        }
-        $this->robotName = $name;
-    }
-
-    public function getRobotId(): int
-    {
-        return $this->robotId;
-    }
-
-    public function getRobotName(): string
-    {
-        return $this->robotName;
-    }
-
-    public function getAdminIds(): array
-    {
-        return $this->robotConfig['adminIds'] ?? [];
-    }
-    public function getOfficeId(): ?int
-    {
-        return $this->officeConfig['officeid'] ?? null;
-    }
-
-    public function setUserDate(\UserDate $userDate): void
-    {
-        $this->userDate = $userDate;
-    }
-    public function getUserDate(): \UserDate
-    {
-        return $this->userDate;
-    }
-    public function getZone(): string
-    {
-        return $this->userDate->getZone();
-    }
-    function formatTime(float $microtime = null, string $format = 'H:i:s.v'): string
-    {
-        return $this->userDate->format($microtime ?? \microtime(true), $format);
-    }
-
-    public function canExecute(): bool
-    {
-        return $this->canExecute ?? false;
-    }
-
-    public function getStopReason(): string
-    {
-        return $this->stopReason ?? 'UNKNOWN';
-    }
-    public function setStopReason(string $stopReason): void
-    {
-        $this->stopReason = $stopReason;
-    }
-
-    function getEditMessage(): bool
-    {
-        return $this->robotConfig['edit'] ?? true;
-    }
-
-    function getSessionName(): string
-    {
-        return $this->robotConfig['mp']['0']['session'];
-    }
-
-    function getPrefixes(): string
-    {
-        return $this->getRobotConfig()['prefixes'] ?? '/!';
-    }
-
-    function getSessionCreated(): float
-    {
-        return $this->sessionCreated ?? 0;
-    }
-
-    function getScriptStarted(): float
-    {
-        return $this->scriptStarted;
-    }
-    function getHandlerUnserialized(): float
-    {
-        return $this->handlerUnserialized;
-    }
-
-    function getSession(): string
-    {
-        return \basename($this->session);
-    }
-
-    function newMessage(array $update): bool
-    {
-        $msgDate    = $update['message']['date'] ?? 0;
-        $newMessage = $msgDate >= intval($this->scriptStarted);
-        return $newMessage;
     }
 }
+
+$signal  = null;
+Loop::run(function () use (&$signal) {
+    if (\defined('SIGINT')) {
+        $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
+            $signal = 'sigint';
+            Logger::log('Got sigint', Logger::FATAL_ERROR);
+            Magic::shutdown(1);
+        });
+        Loop::unreference($siginit);
+
+        $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
+            $signal = 'sigterm';
+            Logger::log('Got sigterm', Logger::FATAL_ERROR);
+            Magic::shutdown(1);
+        });
+        Loop::unreference($sigterm);
+    }
+});
+
+Shutdown::addCallback(
+    static function (): void {
+    },
+    'duration'
+);
 
 $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new \danog\MadelineProto\API($session, $settings);
 $mp->updateSettings(['logger_level' => Logger::NOTICE]);
-//$stngs = $mp->getSettings();
-//Logger::log(toJSON($stngs['app_info']), Logger::ERROR);
+
+Shutdown::addCallback(
+    function () use ($MadelineProto, &$signal) {
+        echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
+        $scriptEndTime = \microTime(true);
+        $stopReason = 'nullapi';
+        if ($signal !== null) {
+            $stopReason = $signal;
+        } elseif ($MadelineProto) {
+            try {
+                $stopReason = $MadelineProto->getEventHandler()->getStopReason();
+                if (false && $stopReason === 'UNKNOWN') {
+                    $error = \error_get_last();
+                    $stopReason = isset($error) ? 'error' : $stopReason;
+                }
+            } catch (\TypeError $e) {
+                $stopReason = 'sigterm';
+            }
+        }
+        $duration = \timeDiffFormatted($scriptEndTime, SCRIPT_START_TIME);
+        $peakMemory = \getPeakMemory();
+        $record   = \updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason, $peakMemory);
+        Logger::log(toJSON($record), Logger::ERROR);
+        $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration;
+        error_log($msg);
+    },
+    'duration'
+);
 
 $authState = authorizationState($mp);
 error_log("Authorization State: " . authorizationStateDesc($authState));
