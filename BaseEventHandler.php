@@ -62,7 +62,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function onStart(): \Generator
     {
-        $dateStr = date('d H:i:s', $this->getStartTime());
+        $dateStr = $this->formatTime($this->getHandlerUnserialized());
         yield $this->logger("Event Handler instantiated at $dateStr!", Logger::ERROR);
 
         $robotConfig = $this->__get('configuration');

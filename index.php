@@ -34,7 +34,7 @@ $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
 if ($restartsCount > ROBOT_CONFIG['maxrestarts']) {
     $text = 'More than ' . ROBOT_CONFIG['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
     Logger::log($text, Logger::ERROR);
-    Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $dateObj->milli(SCRIPT_START_TIME), Logger::ERROR);
+    Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
     exit($text . PHP_EOL);
 }
 
