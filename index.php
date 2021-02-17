@@ -12,20 +12,9 @@ use function Amp\File\{get, put, exists, getSize};
 define("SCRIPT_START_TIME", \microtime(true));
 define('SCRIPT_INFO',       'BASE_P V0.2.0'); // <== Do not change!
 
-\date_default_timezone_set('UTC');
-\ignore_user_abort(true);
-\set_time_limit(0);
-\error_reporting(E_ALL);                                 // always TRUE
-ini_set('ignore_repeated_errors', '1');                 // always TRUE
-ini_set('display_startup_errors', '1');
-ini_set('display_errors',         '1');                 // FALSE only in production or real server
-ini_set('default_charset',        'UTF-8');
-ini_set('precision',              '18');
-ini_set('log_errors',             '1');                 // Error logging engine
-ini_set('error_log',              'MadelineProto.log'); // Logging file path
-
-includeMadeline('phar');
 require_once 'functions.php';
+initPhp();
+includeMadeline('phar');
 require_once  'UserDate.php';
 require_once    'Launch.php';
 require_once 'BaseEventHandler.php';
