@@ -19,3 +19,4 @@ trace.txt
 error_log
 
 config.php
+data/

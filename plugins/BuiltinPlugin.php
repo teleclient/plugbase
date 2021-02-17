@@ -169,7 +169,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= 'Updates Processed: ' . $this->totalUpdates . '<br>';
                 //$status .= 'Loop State: ' . ($eh->getLoopState() ? 'ON' : 'OFF') . '<br>';
                 $status .= 'Notification: ' . $notifStr . PHP_EOL;
-                //$status .= 'Launch Method: ' . getLaunchMethod() . '<br>';
+                $status .= 'Launch Method: ' . \getLaunchMethod() . '<br>';
                 //$status .= 'Previous Stop Time: '       . $lastEndTime . '<br>';
                 //$status .= 'Previous Launch Method: '   . $lastLaunchMethod . '<br>';
                 //$status .= 'Previous Launch Duration: ' . $lastLaunchDuration . '<br>';

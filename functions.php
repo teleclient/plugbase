@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
+use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
-use function\Amp\File\{get, put, exists, getSize};
+use function Amp\File\{get, put, exists, getSize};
 
 function toJSON($var, bool $pretty = true): ?string
 {
@@ -15,6 +16,22 @@ function toJSON($var, bool $pretty = true): ?string
     $json = \json_encode($var, $opts | ($pretty ? JSON_PRETTY_PRINT : 0));
     $json = ($json !== '') ? $json : var_export($var, true);
     return ($json != false) ? $json : null;
+}
+
+function strStartsWith(string $haystack, string $needle, bool $caseSensitive = true): bool
+{
+    $length = strlen($needle);
+    $startOfHaystack = substr($haystack, 0, $length);
+    if ($caseSensitive) {
+        if ($startOfHaystack === $needle) {
+            return true;
+        }
+    } else {
+        if (strcasecmp($startOfHaystack, $needle) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function parseCommand(array $update, string $prefixes = '!/', int $maxParams = 3): array
@@ -117,127 +134,6 @@ function computeVars(array $update, object $eh): array
     return $vars;
 }
 
-
-function appendLaunchRecord(object $eh, string $fileName, float $scriptStartTime, string $launchMethod, string $stopReason, int $peakMemory): array
-{
-    $record['time_start']    = $scriptStartTime;
-    $record['time_end']      = 0;
-    $record['launch_method'] = $launchMethod; // \getLaunchMethod();
-    $record['stop_reason']   = $stopReason;
-    $record['memory_start']  = $peakMemory; // \getPeakMemory();
-    $record['memory_end']    = 0;
-
-    $line = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_end']}";
-    file_put_contents($fileName, "\n" . $line, FILE_APPEND | LOCK_EX);
-    //yield \Amp\File\put($fileName, "\n" . $line);
-
-    return $record;
-}
-
-function updateLaunchRecord(string $fileName, float $scriptStartTime, float $scriptEndTime, string $stopReason, int $peakMemory): array
-{
-    $record = null;
-    $new    = null;
-    $lines = file($fileName);
-    //$lines  = yield Amp\File\get($fileName);
-    $key    = $scriptStartTime . ' ';
-    $content = '';
-    foreach ($lines as $line) {
-        if (strStartsWith($line, $key)) {
-            $items = explode(' ', $line);
-            $record['time_start']    = intval($items[0]); // $scriptStartTime
-            $record['time_end']      = $scriptEndTime;
-            $record['launch_method'] = $items[2]; // \getLaunchMethod();
-            $record['stop_reason']   = $stopReason;
-            $record['memory_start']  = intval($items[4]);
-            $record['memory_end']    = $peakMemory; // \getPeakMemory();
-            $new = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_end']}";
-            $content .= $new . "\n";
-        } else {
-            $content .= $line;
-        }
-    }
-    if ($new === null) {
-        throw new \ErrorException("Launch record not found! key: $scriptStartTime");
-    }
-    file_put_contents($fileName, rtrim($content));
-    //yield Amp\File\put($fileName, rtrim($content));
-    return $record;
-}
-
-function getPreviousLaunch(object $eh, string $fileName, float $scriptStartTime): \Generator
-{
-    $content = yield get($fileName);
-    if ($content === '') {
-        return null;
-    }
-    $content = substr($content, 1);
-    $lines = explode("\n", $content);
-    yield $eh->logger("Launches Count:" . count($lines), Logger::ERROR);
-    $record = null;
-    $key = strval($scriptStartTime) . ' ';
-    foreach ($lines as $line) {
-        if (strStartsWith($line, $key)) {
-            break;
-        }
-        $record = $line;
-    }
-    if ($record === null) {
-        return null;
-    }
-    $fields = explode(' ', trim($record));
-    if (count($fields) !== 6) {
-        throw new \ErrorException("Invalid launch information .");
-    }
-    $launch['time_start']    = intval($fields[0]);
-    $launch['time_end']      = intval($fields[1]);
-    $launch['launch_method'] = $fields[2];
-    $launch['stop_reason']   = $fields[3];
-    $launch['memory_start']  = intval($fields[4]);
-    $launch['memory_end']    = intval($fields[5]);
-    return $launch;
-}
-
-/*
-  Interface, LaunchMethod
-1) Web, Manual
-2) Web, Cron
-3) Web, Restart
-4) CLI, Manual
-5) CLI, Cron
-*/
-function getLaunchMethod(): string
-{
-    if (PHP_SAPI === 'cli') {
-        $interface = 'cli';
-        if (PHP_OS_FAMILY === "Linux") {
-            if ($_SERVER['TERM']) {
-                $launchMethod = 'manual';
-            } else {
-                $launchMethod = 'cron';
-            }
-        } elseif (PHP_OS_FAMILY === "Windows") {
-            $launchMethod = 'manual';
-        } else {
-            throw new Exception('Unknown OS!');
-        }
-    } else {
-        $interface    = 'web';
-        $launchMethod = 'UNKNOWN';
-        if (isset($_SERVER['REQUEST_URI'])) {
-            $requestUri = htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8');
-            if (stripos($requestUri, '?MadelineSelfRestart=') !== false) {
-                $launchMethod = 'restart';
-            } else if (stripos($requestUri, 'cron') !== false) {
-                $launchMethod = 'cron';
-            } else {
-                $launchMethod = 'manual';
-            }
-        }
-    }
-    return $launchMethod;
-}
-
 function getRequestURL(): ?string
 {
     //$_SERVER['REQUEST_URI'] => '/base/?MadelineSelfRestart=1755455420394943907'
@@ -248,7 +144,6 @@ function getRequestURL(): ?string
     }
     return $url;
 }
-
 
 function makeDataDirectory($directory): string
 {
@@ -678,6 +573,46 @@ function hasText(array $update): bool
         $update['message']['_'] !== 'messageService' && $update['message']['_'] !== 'messageEmpty';
 }
 
+/*
+Interface, LaunchMethod
+1) Web, Manual
+2) Web, Cron
+3) Web, Restart
+4) CLI, Manual
+5) CLI, Cron
+*/
+function getLaunchMethod(): string
+{
+    if (PHP_SAPI === 'cli') {
+        $interface = 'cli';
+        if (PHP_OS_FAMILY === "Linux") {
+            if ($_SERVER['TERM']) {
+                $launchMethod = 'manual';
+            } else {
+                $launchMethod = 'cron';
+            }
+        } elseif (PHP_OS_FAMILY === "Windows") {
+            $launchMethod = 'manual';
+        } else {
+            throw new Exception('Unknown OS!');
+        }
+    } else {
+        $interface    = 'web';
+        $launchMethod = 'UNKNOWN';
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $requestUri = htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8');
+            if (stripos($requestUri, '?MadelineSelfRestart=') !== false) {
+                $launchMethod = 'restart';
+            } else if (stripos($requestUri, 'cron') !== false) {
+                $launchMethod = 'cron';
+            } else {
+                $launchMethod = 'manual';
+            }
+        }
+    }
+    return $launchMethod;
+}
+
 function initPhp(): void
 {
     \date_default_timezone_set('UTC');
@@ -746,7 +681,7 @@ function checkTooManyRestarts(string $startupFilename): int
     return $restartsCount;
 }
 
-function myStartAndLoop(\danog\madelineproto\API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
+function myStartAndLoop(API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
 {
     $maxRecycles  = 10;
     $recycleTimes = [];
@@ -791,7 +726,7 @@ function myStartAndLoop(\danog\madelineproto\API $MadelineProto, string $eventHa
     };
 }
 
-function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, array $robotConfig = [], array $genLoops = []): void
+function safeStartAndLoop(API $mp, string $eventHandler, array $robotConfig = [], array $genLoops = []): void
 {
     $mp->async(true);
     $mp->__set('config', $robotConfig);
@@ -804,9 +739,16 @@ function safeStartAndLoop(\danog\madelineproto\API $mp, string $eventHandler, ar
                     yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 }
                 $me = yield $mp->start();
+                if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
+                    yield $mp->logger("Unsuccessful Login!", Logger::ERROR);
+                    throw new ErrorException('Unsuccessful Login!');
+                } else {
+                    yield $mp->logger("Successfully Loged-in!", Logger::ERROR);
+                }
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
+                yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 yield $mp->setEventHandler($eventHandler);
                 $eh = $mp->getEventHandler($eventHandler);
                 $eh->setSelf($me);

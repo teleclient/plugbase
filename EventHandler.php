@@ -30,16 +30,16 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
         parent::__construct($apiWrapper);
-        Logger::log(toJSON(ROBOT_CONFIG));
         $now = microtime(true);
+        Logger::log(toJSON(ROBOT_CONFIG));
 
-        sleep(2);
+        //sleep(2);
         $userDate = new \UserDate(ROBOT_CONFIG['zone']);
         Logger::Log("EventHandler instantiated at " . $userDate->format($now), Logger::ERROR);
 
         $this->sessionCreated      = $now;
         $this->handlerUnserialized = $now;
-        $this->scriptStarted       = SCRIPT_START;
+        $this->scriptStarted       = SCRIPT_START_TIME;
 
         $this->canExecute          = false;
         $this->stopReason          = "UNKNOWN";
@@ -50,7 +50,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function __wakeup()
     {
-        $this->scriptStarted  = SCRIPT_START;
+        $this->scriptStarted  = SCRIPT_START_TIME;
         $now = microtime(true);
         $this->handlerUnserialized = $now;
         $userDate = new \UserDate(ROBOT_CONFIG['zone']);
@@ -62,6 +62,9 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function onStart(): \Generator
     {
+        $dateStr = date('d H:i:s', $this->getStartTime());
+        yield $this->logger("Event Handler instantiated at $dateStr!", Logger::ERROR);
+
         $robotConfig = $this->__get('configuration');
         if ($robotConfig) {
             echo (toJSON($robotConfig) . PHP_EOL);

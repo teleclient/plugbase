@@ -3,7 +3,7 @@
     "description": "Project description",
     "type": "project",
     "require": {
-        "danog/madelineproto": "dev-master"
+        "danog/madelineproto": "^5.1"
     },
     "autoload": {
         "psr-4": {

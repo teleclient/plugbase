@@ -2,43 +2,48 @@
 
 declare(strict_types=1);
 
-use danog\madelineproto\Logger;
-use danog\madelineproto\Shutdown;
-use \danog\MadelineProto\API;
-use \danog\MadelineProto\Magic;
-use \danog\MadelineProto\Loop\Generic\GenericLoop;
+use danog\MadelineProto\Logger;
+use danog\MadelineProto\Shutdown;
+use danog\MadelineProto\API;
+use danog\MadelineProto\Magic;
 use Amp\Loop;
-use function\Amp\File\{get, put, exists, getSize};
+use function Amp\File\{get, put, exists, getSize};
 
-define('SCRIPT_START', microtime(true));
-define('SCRIPT_INFO',  'BASE_P V0.2.0'); // <== Do not change!
 define("SCRIPT_START_TIME", \microtime(true));
-define("MEMORY_LIMIT",      \ini_get('memory_limit'));
-define('REQUEST_URL',       \getRequestURL() ?? '');
-define('USER_AGENT',        \getUserAgent() ?? '');
-define("DATA_DIRECTORY",    \makeDataDirectory('data'));
-define("STARTUPS_FILE",     \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
-define("LAUNCHES_FILE",     \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
+define('SCRIPT_INFO',       'BASE_P V0.2.0'); // <== Do not change!
 
 require_once 'functions.php';
-require_once 'UserDate.php';
+require_once  'UserDate.php';
+require_once    'Launch.php';
 initPhp();
 includeMadeline('phar');
-define('ROBOT_CONFIG', include('config.php'));
-$userDate = new \UserDate(ROBOT_CONFIG['zone']);
-error_log('Script started at: ' . $userDate->format(SCRIPT_START) . '<br>');
 
-$restartsCount = checkTooManyRestarts(LAUNCHES_FILE);
-if ($restartsCount > $config->maxrestarts) {
-    $text = 'More than ' . $config->maxrestarts . ' times restarted within a minute. Permanently shutting down ....';
+define('ROBOT_CONFIG',   include('config.php'));
+define("MEMORY_LIMIT",   \ini_get('memory_limit'));
+define('REQUEST_URL',    \getRequestURL() ?? '');
+define('USER_AGENT',     \getUserAgent() ?? '');
+define("DATA_DIRECTORY", \makeDataDirectory('data'));
+define("STARTUPS_FILE",  \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
+define("LAUNCHES_FILE",  \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
+
+$userDate = new \UserDate(ROBOT_CONFIG['zone']);
+error_log('Script started at: ' . $userDate->format(SCRIPT_START_TIME));
+
+$restartsCount = checkTooManyRestarts(STARTUPS_FILE);
+if ($restartsCount > ROBOT_CONFIG['maxrestarts']) {
+    $text = 'More than ' . ROBOT_CONFIG['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
     Logger::log($text, Logger::ERROR);
     Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $dateObj->milli(SCRIPT_START_TIME), Logger::ERROR);
     exit($text . PHP_EOL);
 }
 
+$launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
+error_log("Appended Run Record: " . toJSON($launch));
+unset($launch);
+
 if (PHP_SAPI !== 'cli') {
     if (!\getWebServerName()) {
-        \setWebServerName($config->host);
+        \setWebServerName(ROBOT_CONFIG['config->host']);
         if (!\getWebServerName()) {
             $text = "To enable the restart, the config->host must be defined!";
             echo ($text . PHP_EOL);
@@ -74,19 +79,20 @@ Shutdown::addCallback(
 
 $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
-$mp = new \danog\MadelineProto\API($session, $settings);
+$mp = new API($session, $settings);
 $mp->updateSettings(['logger_level' => Logger::NOTICE]);
 
+$signal = null;
 Shutdown::addCallback(
-    function () use ($MadelineProto, &$signal) {
+    function () use ($mp, $signal) {
         echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
         $scriptEndTime = \microTime(true);
         $stopReason = 'nullapi';
         if ($signal !== null) {
             $stopReason = $signal;
-        } elseif ($MadelineProto) {
+        } elseif ($mp) {
             try {
-                $stopReason = $MadelineProto->getEventHandler()->getStopReason();
+                $stopReason = $mp->getEventHandler()->getStopReason();
                 if (false && $stopReason === 'UNKNOWN') {
                     $error = \error_get_last();
                     $stopReason = isset($error) ? 'error' : $stopReason;
@@ -95,11 +101,12 @@ Shutdown::addCallback(
                 $stopReason = 'sigterm';
             }
         }
-        $duration = \timeDiffFormatted($scriptEndTime, SCRIPT_START_TIME);
+        $duration   = \timeDiffFormatted($scriptEndTime, SCRIPT_START_TIME);
         $peakMemory = \getPeakMemory();
-        $record   = \updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason, $peakMemory);
+        $record     = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason, $peakMemory);
         Logger::log(toJSON($record), Logger::ERROR);
         $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration;
+        Logger::log($msg, Logger::ERROR);
         error_log($msg);
     },
     'duration'
