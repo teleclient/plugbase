@@ -15,6 +15,7 @@ define('SCRIPT_INFO',       'BASE_P V0.2.0'); // <== Do not change!
 require_once 'functions.php';
 require_once  'UserDate.php';
 require_once    'Launch.php';
+require_once 'BaseEventHandler.php';
 initPhp();
 includeMadeline('phar');
 
