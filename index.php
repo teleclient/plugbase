@@ -12,12 +12,12 @@ use function Amp\File\{get, put, exists, getSize};
 define("SCRIPT_START_TIME", \microtime(true));
 define('SCRIPT_INFO',       'BASE_P V0.2.0'); // <== Do not change!
 
+initPhp();
+includeMadeline('phar');
 require_once 'functions.php';
 require_once  'UserDate.php';
 require_once    'Launch.php';
 require_once 'BaseEventHandler.php';
-initPhp();
-includeMadeline('phar');
 
 define('ROBOT_CONFIG',   include('config.php'));
 define("MEMORY_LIMIT",   \ini_get('memory_limit'));
