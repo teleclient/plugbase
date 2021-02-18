@@ -89,7 +89,7 @@ function timeDiffFormatted(float $startTime, float $endTime = null): string
 
     $sec   = intval($diff);
     $micro = $diff - $sec;
-    echo ("$sec  $micro" . PHP_EOL);
+    \danog\MadelineProto\Logger::log("Parts to Debug: $sec  $micro", \danog\MadelineProto\Logger::ERROR);
     return \strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
 }
 
