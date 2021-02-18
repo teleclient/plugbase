@@ -84,7 +84,7 @@ $mp = new API($session, $settings);
 $mp->updateSettings(['logger_level' => Logger::NOTICE]);
 
 Shutdown::addCallback(
-    function () use ($mp, $signal) {
+    function () use ($mp, &$signal) {
         $scriptEndTime = \microTime(true);
         echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
         $stopReason = 'nullapi';
