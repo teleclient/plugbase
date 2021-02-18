@@ -38,29 +38,30 @@ class UserDate
         return $dateObj->format($format);
     }
 
-    function duration(float $start, float $end = null): string
+    public static function duration(float $startTime, float $endTime = null): string
     {
-        $end = $end ?? \microtime(true);
-        $diff = $end - $start;
+        $endTime = $endTime ?? microtime(true);
 
-        // Break the difference into seconds and microseconds
-        $secs = intval($diff);
-        $micro = $diff - $secs;
+        $diff = $endTime - $startTime;
 
-        // $final will contain something like "00:00:02.452"
-        //$final = strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
-        //return $final;
+        $sec   = intval($diff);
+        $micro = $diff - $sec;
+        //\danog\MadelineProto\Logger::log("Parts to Debug: $sec  $micro  Diff: $diff  Start: $startTime End: $endTime", \danog\MadelineProto\Logger::ERROR);
+        return \strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
+    }
 
-        $days = floor($secs / 86400);
-        $hours = floor(($secs / 3600) % 3600);
-        $minutes = floor(($secs / 60) % 60);
-        $seconds = $secs % 60;
-        $ageStr = sprintf("%02d:%02d:%02d:%02d", $days, $hours, $minutes, $seconds) . str_replace('0.', '.', sprintf('%.3f', $micro));
-        return $ageStr;
+    public static function toMilli(float $microtime = null): int
+    {
+        $microtime = $microtime ?? microtime(true);
+        return intval($microtime * 1000);
+
+        //$mt = explode(' ', microtime());
+        //return ((int)$mt[1]) * 1000 + ((int)round($mt[0] * 1000));
     }
 }
 
-function milliDate(string $zone, float $time = null, string $format = 'H:i:s.v'): string
+
+function milliDate_DELETE(string $zone, float $time = null, string $format = 'H:i:s.v'): string
 {
     $time   = $time ?? \microtime(true);
     $zoneObj = new \DateTimeZone($zone);
@@ -69,8 +70,18 @@ function milliDate(string $zone, float $time = null, string $format = 'H:i:s.v')
     return $dateObj->format($format);
 }
 
-function computeDuration(float $start, float $end = null): string
+function computeDuration_DELETE(float $startTime, float $endTime = null): string
 {
+    $endTime = $endTime ?? microtime(true);
+
+    $diff  = $endTime - $startTime;
+
+    $sec   = intval($diff);
+    $micro = $diff - $sec;
+    //\danog\MadelineProto\Logger::log("Parts to Debug: $sec  $micro  Diff: $diff  Start: $startTime End: $endTime", \danog\MadelineProto\Logger::ERROR);
+    return \strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
+
+    /*
     $end = $end ?? \microtime(true);
     $age     = intval($end - $start); // seconds
     $days    = floor($age  / 86400);
@@ -79,9 +90,10 @@ function computeDuration(float $start, float $end = null): string
     $seconds = $age % 60;
     $ageStr  = sprintf("%02d:%02d:%02d:%02d", $days, $hours, $minutes, $seconds);
     return $ageStr;
+    */
 }
 
-function timeDiffFormatted(float $startTime, float $endTime = null): string
+function timeDiffFormatted_DELETE(float $startTime, float $endTime = null): string
 {
     $endTime = $endTime ?? microtime(true);
 
@@ -89,11 +101,11 @@ function timeDiffFormatted(float $startTime, float $endTime = null): string
 
     $sec   = intval($diff);
     $micro = $diff - $sec;
-    \danog\MadelineProto\Logger::log("Parts to Debug: $sec  $micro  Diff: $diff  Start: $startTime End: $endTime", \danog\MadelineProto\Logger::ERROR);
+    //\danog\MadelineProto\Logger::log("Parts to Debug: $sec  $micro  Diff: $diff  Start: $startTime End: $endTime", \danog\MadelineProto\Logger::ERROR);
     return \strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
 }
 
-function nowMilli(): int
+function nowMilli_DELETE(): int
 {
     $mt = explode(' ', microtime());
     return ((int)$mt[1]) * 1000 + ((int)round($mt[0] * 1000));
