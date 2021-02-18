@@ -31,7 +31,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         parent::__construct($apiWrapper);
         $now = microtime(true);
-        $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 0, 'kill');
+        $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
 
         $this->sessionCreated      = $now;
         $this->handlerUnserialized = $now;

@@ -101,7 +101,7 @@ Shutdown::addCallback(
                 $stopReason = 'sigterm';
             }
         }
-        $record   = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
+        $record   = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
         Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
         $duration = \timeDiffFormatted($scriptEndTime, SCRIPT_START_TIME);
         $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration;
