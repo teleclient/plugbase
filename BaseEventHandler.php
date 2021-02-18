@@ -31,18 +31,20 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         parent::__construct($apiWrapper);
         $now = microtime(true);
-        Logger::log(toJSON(ROBOT_CONFIG));
-
-        //sleep(2);
-        $userDate = new \UserDate(ROBOT_CONFIG['zone']);
-        Logger::Log("EventHandler instantiated at " . $userDate->format($now), Logger::ERROR);
+        $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 0, 'kill');
 
         $this->sessionCreated      = $now;
         $this->handlerUnserialized = $now;
         $this->scriptStarted       = SCRIPT_START_TIME;
 
-        $this->canExecute          = false;
-        $this->stopReason          = "UNKNOWN";
+        $this->userDate    = new \UserDate(ROBOT_CONFIG['zone']);
+        $this->robotConfig = ROBOT_CONFIG;
+        $this->canExecute  = false;
+        $this->stopReason  = "UNKNOWN";
+
+        Logger::log(toJSON(ROBOT_CONFIG));
+        Logger::Log("EventHandler instantiated at " . $this->userDate->format($now), Logger::ERROR);
+        Logger::log("EventHandler Update Run Record: " . toJSON($record), Logger::ERROR);
 
         $this->builtinPlugin = new BuiltinPlugin($this);
         $this->yourPlugin    = new    YourPlugin($this);
@@ -65,12 +67,10 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $dateStr = $this->formatTime($this->getHandlerUnserialized());
         yield $this->logger("Event Handler instantiated at $dateStr!", Logger::ERROR);
 
-        $robotConfig = $this->__get('configuration');
-        if ($robotConfig) {
-            echo (toJSON($robotConfig) . PHP_EOL);
-        }
         $start = $this->formatTime(microtime(true));
         yield $this->logger("EventHandler::onStart executed at $start", Logger::ERROR);
+
+        $this->setSelf();
 
         if (method_exists('BuiltinPlugin', 'onStart')) {
             yield $this->builtinPlugin->onStart($this);
@@ -93,17 +93,14 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $processed = yield ($this->yourPlugin)($update, $vars, $this);
     }
 
-    public function setRobotConfig(array $robotConfig)
-    {
-        $this->robotConfig = $robotConfig;
-    }
     public function getRobotConfig(): array
     {
         return $this->robotConfig;
     }
 
-    public function setSelf(array $self)
+    public function setSelf()
     {
+        $self = $this->getSelf();
         $this->robotId = $self['id'];
         $name = strval($self['id']);
         if (isset($self['username'])) {
@@ -135,10 +132,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->officeConfig['officeid'] ?? null;
     }
 
-    public function setUserDate(\UserDate $userDate): void
-    {
-        $this->userDate = $userDate;
-    }
     public function getUserDate(): \UserDate
     {
         return $this->userDate;

@@ -32,7 +32,8 @@ class Launch
 
     public static function updateLaunchRecord(string $fileName, float $scriptStartTime, float $scriptEndTime, string $stopReason): array
     {
-        $key = self::strMillitime($scriptStartTime);
+        $key     = self::strMillitime($scriptStartTime);
+        $timeEnd = self::strMillitime($scriptEndTime);
         //Logger::log("Key Update: '$key'", Logger::ERROR);
 
         $record = null;
@@ -44,7 +45,7 @@ class Launch
             if (strStartsWith($line, $key . ' ')) {
                 $items = explode(' ', $line);
                 $record['time_start']    = intval($items[0]);
-                $record['time_end']      = $scriptEndTime;
+                $record['time_end']      = $timeEnd;
                 $record['launch_method'] = $items[2]; // \getLaunchMethod();
                 $record['stop_reason']   = $stopReason;
                 $record['memory_start']  = intval($items[4]);

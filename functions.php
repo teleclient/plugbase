@@ -743,17 +743,13 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $robotConfig = []
                     yield $mp->logger("Unsuccessful Login!", Logger::ERROR);
                     throw new ErrorException('Unsuccessful Login!');
                 } else {
-                    yield $mp->logger("Successfully Loged-in!", Logger::ERROR);
+                    yield $mp->logger("Robot is currently logged-in!", Logger::ERROR);
                 }
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
-                yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 yield $mp->setEventHandler($eventHandler);
-                $eh = $mp->getEventHandler($eventHandler);
-                $eh->setSelf($me);
-                $eh->setRobotConfig($robotConfig);
-                $eh->setUserDate(new \UserDate($robotConfig['zone'] ?? 'UTC'));
+                //$eh = $mp->getEventHandler($eventHandler);
                 foreach ($genLoops as $genLoop) {
                     $genLoop->start(); // Do NOT use yield.
                 }

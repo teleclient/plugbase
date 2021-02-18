@@ -133,7 +133,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $memoryLimit     = ini_get('memory_limit');
                 $memoryLimit     = $memoryLimit === '-1' || $memoryLimit === '0' ? 'MAX' : $memoryLimit;
                 $sessionSize     = formatBytes(getFileSize($eh->getSessionName()), 3);
-                $launch          = false; // yield \getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
+                $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
                 if ($launch) {
                     $lastStartTime      = strval($launch['time_start']);
                     $lastEndTime        = strval($launch['time_end']);
@@ -170,10 +170,10 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 //$status .= 'Loop State: ' . ($eh->getLoopState() ? 'ON' : 'OFF') . '<br>';
                 $status .= 'Notification: ' . $notifStr . PHP_EOL;
                 $status .= 'Launch Method: ' . \getLaunchMethod() . '<br>';
-                //$status .= 'Previous Stop Time: '       . $lastEndTime . '<br>';
-                //$status .= 'Previous Launch Method: '   . $lastLaunchMethod . '<br>';
-                //$status .= 'Previous Launch Duration: ' . $lastLaunchDuration . '<br>';
-                //$status .= 'Previous Peak Memory: '     . $lastPeakMemory . '<br>';
+                $status .= 'Previous Stop Time: '       . $lastEndTime . '<br>';
+                $status .= 'Previous Launch Method: '   . $lastLaunchMethod . '<br>';
+                $status .= 'Previous Launch Duration: ' . $lastLaunchDuration . '<br>';
+                $status .= 'Previous Peak Memory: '     . $lastPeakMemory . '<br>';
                 yield respond($eh, $peer, $msgId, $status);
                 yield $eh->logger("Command '/status' successfuly executed at " . date('d H:i:s!'), Logger::ERROR);
                 break;

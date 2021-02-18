@@ -58,14 +58,14 @@ Loop::run(function () use (&$signal) {
     if (\defined('SIGINT')) {
         $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
             $signal = 'sigint';
-            Logger::log('Got sigint', Logger::FATAL_ERROR);
+            Logger::log('Robot received SIGINT signal', Logger::ERROR);
             Magic::shutdown(1);
         });
         Loop::unreference($siginit);
 
         $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
             $signal = 'sigterm';
-            Logger::log('Got sigterm', Logger::FATAL_ERROR);
+            Logger::log('Robot received SIGTERM signal', Logger::ERROR);
             Magic::shutdown(1);
         });
         Loop::unreference($sigterm);
@@ -83,11 +83,10 @@ $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new API($session, $settings);
 $mp->updateSettings(['logger_level' => Logger::NOTICE]);
 
-$signal = null;
 Shutdown::addCallback(
     function () use ($mp, $signal) {
-        echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
         $scriptEndTime = \microTime(true);
+        echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
         $stopReason = 'nullapi';
         if ($signal !== null) {
             $stopReason = $signal;
@@ -102,10 +101,9 @@ Shutdown::addCallback(
                 $stopReason = 'sigterm';
             }
         }
-        $duration   = \timeDiffFormatted($scriptEndTime, SCRIPT_START_TIME);
-        $peakMemory = \getPeakMemory();
-        $record     = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason, $peakMemory);
-        Logger::log(toJSON($record), Logger::ERROR);
+        $record   = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
+        Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
+        $duration = \timeDiffFormatted($scriptEndTime, SCRIPT_START_TIME);
         $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration;
         Logger::log($msg, Logger::ERROR);
         error_log($msg);
