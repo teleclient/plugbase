@@ -71,21 +71,21 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 if (Shutdown::removeCallback('restarter')) {
                     yield $eh->logger('Self-Restarter disabled.', Logger::ERROR);
                 }
-                yield $eh->logger('Robot stopped at ' . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logger('Robot stopped at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->stop();
                 return true;
             }
 
             //Function: Finnish executing the Restart command.
             if ($vars['msgText'] === 'Robot is restarting ...') {
-                yield $eh->logger('Robot restarted at ' . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->restart();
                 return true;
             }
 
             //Function: Finnish executing the Logout command.
             if ($vars['msgText'] === 'Robot is logging out ...') {
-                yield $eh->logger('Robot logged out at ' . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logger('Robot logged out at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->logout();
                 return true;
             }
@@ -114,7 +114,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                     'reply_to_msg_id' => $msgId,
                     'message'         => 'Pong'
                 ]);
-                yield $eh->logger("Command '/ping' successfuly executed at " . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logger("Command '/ping' successfuly executed at " . $eh->formatTime() '!', Logger::ERROR);
                 $executed = true;
                 break;
         }
@@ -125,7 +125,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
             case 'help':
                 $text = getHelpText($eh->getPrefixes());
                 yield respond($eh, $peer, $msgId, $text);
-                yield $eh->logger("Command '/help' successfuly executed at " . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'status':
                 $peakMemUsage    = formatBytes(\getPeakMemory(), 3);
@@ -175,7 +175,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= 'Previous Launch Duration: ' . $lastLaunchDuration . '<br>';
                 $status .= 'Previous Peak Memory: '     . $lastPeakMemory . '<br>';
                 yield respond($eh, $peer, $msgId, $status);
-                yield $eh->logger("Command '/status' successfuly executed at " . date('d H:i:s!'), Logger::ERROR);
+                yield $eh->logger("Command '/status' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'stats':
                 $text   = "Preparing statistics ....";
@@ -275,7 +275,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 if (PHP_SAPI === 'cli') {
                     $text = "Command '/restart' is only avaiable under webservers. Ignored!";
                     yield respond($eh, $peer, $msgId, $text);
-                    yield $eh->logger("Command '/restart' is only avaiable under webservers. Ignored!  " . date('d H:i:s!'), Logger::ERROR);
+                    yield $eh->logger("Command '/restart' is only avaiable under webservers. Ignored!  " . $eh->formatTime() . '!', Logger::ERROR);
                     break;
                 }
                 $text = 'Robot is restarting ...';

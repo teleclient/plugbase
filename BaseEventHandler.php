@@ -85,7 +85,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         if (!$this->canExecute && $this->newMessage($update)) {
             $this->canExecute = true;
-            yield $this->logger('Command-Processing engine started at ' . date('d H:i:s'), Logger::ERROR);
+            yield $this->logger('Command-Processing engine started at ' . $this->formatDate(), Logger::ERROR);
         }
 
         $vars = computeVars($update, $this);

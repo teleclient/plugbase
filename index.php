@@ -104,7 +104,7 @@ Shutdown::addCallback(
         $record   = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
         Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
         $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
-        $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: \n\n" . $duration;
+        $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!\n\n\n";
         Logger::log($msg, Logger::ERROR);
         error_log($msg);
     },
