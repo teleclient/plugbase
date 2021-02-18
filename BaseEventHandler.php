@@ -70,7 +70,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $start = $this->formatTime(microtime(true));
         yield $this->logger("EventHandler::onStart executed at $start", Logger::ERROR);
 
-        $this->setSelf();
+        $self = yield $this->getSelf();
+        yield $this->setSelf($self);
 
         if (method_exists('BuiltinPlugin', 'onStart')) {
             yield $this->builtinPlugin->onStart($this);
@@ -98,9 +99,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->robotConfig;
     }
 
-    public function setSelf()
+    public function setSelf(array $self): void
     {
-        $self = $this->getSelf();
         $this->robotId = $self['id'];
         $name = strval($self['id']);
         if (isset($self['username'])) {
