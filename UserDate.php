@@ -89,7 +89,8 @@ function timeDiffFormatted(float $startTime, float $endTime = null): string
 
     $sec   = intval($diff);
     $micro = $diff - $sec;
-    return strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
+    echo ("$sec  $micro" . PHP_EOL);
+    return \strftime('%T', mktime(0, 0, $sec)) . str_replace('0.', '.', sprintf('%.3f', $micro));
 }
 
 function nowMilli(): int
