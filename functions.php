@@ -666,7 +666,7 @@ function checkTooManyRestarts(string $startupFilename): int
         // Create the file
     }
 
-    $nowMilli = nowMilli();
+    $nowMilli = intval(microtime(true) * 1000);
     $aMinuteAgo = $nowMilli - 60 * 1000;
     foreach ($startups as $index => $startupstr) {
         $startup = intval($startupstr);
