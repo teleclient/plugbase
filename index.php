@@ -105,7 +105,7 @@ Shutdown::addCallback(
         Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
         $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
         $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!\n\n\n";
-        Logger::log($msg, Logger::ERROR);
+        //Logger::log($msg, Logger::ERROR);
         error_log($msg);
     },
     'duration'

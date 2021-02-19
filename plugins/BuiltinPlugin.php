@@ -135,12 +135,9 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $sessionSize     = formatBytes(getFileSize($eh->getSessionName()), 3);
                 $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
                 if ($launch) {
-                    $lastStartTime      = $eh->formatTime($launch['time_start']);
                     $lastEndTime        = $eh->formatTime($launch['time_end']);
                     $lastLaunchMethod   = $launch['launch_method'];
-                    $durationNano       = $lastEndTime - $lastStartTime;
-                    $duration           = \UserDate::duration($launch['time_start'], $launch['time_end']);
-                    $lastLaunchDuration = strval($duration);
+                    $lastLaunchDuration = \UserDate::duration($launch['time_start'], $launch['time_end']);
                     $lastPeakMemory     = formatBytes($launch['memory_end']);
                 } else {
                     $lastEndTime        = 'UNAVAILABLE';
