@@ -128,7 +128,7 @@ class Launch
             return null;
         }
         $fields = explode(' ', trim($record));
-        if (count($fields) !== 6) {
+        if (count($fields) !== 7) {
             throw new \ErrorException("Invalid launch information .");
         }
         $launch['time_start']    = self::microtimeFromStr($fields[0]);
