@@ -13,9 +13,9 @@ class Launch
 
     public static function appendLaunchRecord(string $fileName, float $scriptStartTime, string $stopReason): array
     {
-        $key = self::strMillitime($scriptStartTime);
+        $key = self::microtimeToStr($scriptStartTime);
 
-        $record['time_start']    = intval($key);
+        $record['time_start']    = $key;
         $record['time_end']      = 0;
         $record['launch_method'] = \getLaunchMethod();
         $record['stop_reason']   = $stopReason;
@@ -23,16 +23,18 @@ class Launch
         $record['memory_middle'] = 0;
         $record['memory_end']    = 0;
 
-        $line = "$key {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
+        $line = self::makeLine($record);
+
         file_put_contents($fileName, "\n" . $line, FILE_APPEND | LOCK_EX);
         //yield \Amp\File\put($fileName, "\n" . $line);
 
+        $record['time_start'] = $scriptStartTime;
         return $record;
     }
 
     public static function updateLaunchRecord(string $fileName, float $scriptStartTime): array
     {
-        $key = self::strMillitime($scriptStartTime);
+        $key = self::microtimeToStr($scriptStartTime);
 
         $record = null;
         $new    = null;
@@ -49,7 +51,8 @@ class Launch
                 $record['memory_start']  = intval($items[4]);
                 $record['memory_middle'] = \getPeakMemory();
                 $record['memory_end']    = intval($items[6]);
-                $new = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
+
+                $new = self::makeLine($record);
                 $content .= $new . "\n";
             } else {
                 $content .= $line;
@@ -60,12 +63,15 @@ class Launch
         }
         file_put_contents($fileName, rtrim($content));
         //yield Amp\File\put($fileName, rtrim($content));
+
+        $record['time_start'] = $scriptStartTime;
+        $record['time_end']   = self::microtimeFromStr($items[1]);
         return $record;
     }
 
     public static function finalizeLaunchRecord(string $fileName, float $scriptStartTime, float $scriptEndTime, string $stopReason): array
     {
-        $key = self::strMillitime($scriptStartTime);
+        $key = self::microtimeToStr($scriptStartTime);
 
         $record = null;
         $new    = null;
@@ -82,7 +88,8 @@ class Launch
                 $record['memory_start']  = intval($items[4]);
                 $record['memory_middle'] = intval($items[5]);
                 $record['memory_end']    = \getPeakMemory();
-                $new = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
+                $new = self::makeLine($record);
+                //$new = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
                 $content .= $new . "\n";
             } else {
                 $content .= $line;
@@ -93,12 +100,15 @@ class Launch
         }
         file_put_contents($fileName, rtrim($content));
         //yield Amp\File\put($fileName, rtrim($content));
+
+        $record['time_start'] = $scriptStartTime;
+        $record['time_end']   = $scriptEndTime;
         return $record;
     }
 
     public static function getPreviousLaunch(object $eh, string $fileName, float $scriptStartTime): \Generator
     {
-        $key = self::strMillitime($scriptStartTime);
+        $key = self::microtimeToStr($scriptStartTime);
 
         $content = yield get($fileName);
         if ($content === '') {
@@ -121,8 +131,8 @@ class Launch
         if (count($fields) !== 6) {
             throw new \ErrorException("Invalid launch information .");
         }
-        $launch['time_start']    = intval($fields[0]);
-        $launch['time_end']      = intval($fields[1]);
+        $launch['time_start']    = self::microtimeFromStr($fields[0]);
+        $launch['time_end']      = self::microtimeFromStr($fields[1]);
         $launch['launch_method'] = $fields[2];
         $launch['stop_reason']   = $fields[3];
         $launch['memory_start']  = intval($fields[4]);
@@ -131,8 +141,19 @@ class Launch
         return $launch;
     }
 
-    private static function strMillitime(float $microtime): string
+    private static function makeLine(array $record): string
     {
-        return strval(intval(round($microtime * 1000)));
+        return "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
+    }
+
+    private static function microtimeToStr(float $microtime): string
+    {
+        return strval(intval(round($microtime * 1000 * 1000)));
+    }
+
+    private static function microtimeFromStr(string $strMicrotime): float
+    {
+        //return strval(intval(round($microtime * 1000 * 1000)));
+        return round(intval($strMicrotime) / 1000000);
     }
 }

@@ -114,7 +114,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                     'reply_to_msg_id' => $msgId,
                     'message'         => 'Pong'
                 ]);
-                yield $eh->logger("Command '/ping' successfuly executed at " . $eh->formatTime() '!', Logger::ERROR);
+                yield $eh->logger("Command '/ping' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 $executed = true;
                 break;
         }
@@ -135,11 +135,11 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $sessionSize     = formatBytes(getFileSize($eh->getSessionName()), 3);
                 $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
                 if ($launch) {
-                    $lastStartTime      = strval($launch['time_start']);
-                    $lastEndTime        = strval($launch['time_end']);
+                    $lastStartTime      = $eh->formatTime($launch['time_start']);
+                    $lastEndTime        = $eh->formatTime($launch['time_end']);
                     $lastLaunchMethod   = $launch['launch_method'];
                     $durationNano       = $lastEndTime - $lastStartTime;
-                    $duration           = $lastEndTime ? \computeDuration($durationNano) : 'UNAVAILABLE';
+                    $duration           = \UserDate::duration($launch['time_start'], $launch['time_end']);
                     $lastLaunchDuration = strval($duration);
                     $lastPeakMemory     = formatBytes($launch['memory_end']);
                 } else {
@@ -151,15 +151,16 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $notif = $this->getNotif();
                 $notifState = substr($notif, 0, 2) === 'on' ? 'ON' : 'OFF';
                 $notifAge   = $notifState === 'OFF' ? '' : (strlen($notif) <= 3 ? ' / Never wipe' : (' / Wipe after ' . substr($notif, 3) . ' secs'));
-                $notifStr = "$notifState$notifAge";
+                $notifStr   = "$notifState$notifAge";
+                $now        = \microtime(true);
 
                 $status  = '<b>STATUS:</b>  (Script: ' . SCRIPT_INFO . ')<br>';
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: $robotId<br>";
-                $status .= "Session Age: "      . computeDuration($eh->getSessionCreated()) .      "<br>";
-                $status .= "Script Age: "       . computeDuration($eh->getScriptStarted()) .       "<br>";
-                $status .= "API Instance Age: " . computeDuration($eh->getHandlerUnserialized()) . "<br>";
+                $status .= "Session Age: "      . \UserDate::duration($eh->getSessionCreated(),      $now) . "<br>";
+                $status .= "Script Age: "       . \UserDate::duration($eh->getScriptStarted(),       $now) . "<br>";
+                $status .= "API Instance Age: " . \UserDate::duration($eh->getHandlerUnserialized(), $now) . "<br>";
                 $status .= "Peak Memory: $peakMemUsage<br>";
                 $status .= "Current Memory: $currentMemUsage<br>";
                 $status .= "Allowed Memory: $memoryLimit<br>";
