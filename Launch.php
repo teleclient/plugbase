@@ -82,14 +82,13 @@ class Launch
             if (strStartsWith($line, $key . ' ')) {
                 $items = explode(' ', $line);
                 $record['time_start']    = intval($items[0]);
-                $record['time_end']      = intval(round($scriptEndTime * 1000));
-                $record['launch_method'] = $items[2]; // \getLaunchMethod();
+                $record['time_end']      = self::microtimeToStr($scriptEndTime);
+                $record['launch_method'] = $items[2];
                 $record['stop_reason']   = $stopReason;
                 $record['memory_start']  = intval($items[4]);
                 $record['memory_middle'] = intval($items[5]);
                 $record['memory_end']    = \getPeakMemory();
                 $new = self::makeLine($record);
-                //$new = "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
                 $content .= $new . "\n";
             } else {
                 $content .= $line;
