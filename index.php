@@ -58,15 +58,17 @@ Loop::run(function () use (&$signal) {
     if (\defined('SIGINT')) {
         $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
             $signal = 'sigint';
+            error_log('Robot received SIGINT signal');
             Logger::log('Robot received SIGINT signal', Logger::ERROR);
-            Magic::shutdown(1);
+            //Magic::shutdown(1);
         });
         Loop::unreference($siginit);
 
         $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
             $signal = 'sigterm';
+            error_log('Robot received SIGTERM signal');
             Logger::log('Robot received SIGTERM signal', Logger::ERROR);
-            Magic::shutdown(1);
+            //Magic::shutdown(1);
         });
         Loop::unreference($sigterm);
     }
