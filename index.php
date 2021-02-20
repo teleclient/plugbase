@@ -74,46 +74,50 @@ if (false && \defined('SIGINT')) {
     });
 }
 
-Shutdown::addCallback(
-    static function (): void {
-    },
-    'duration'
-);
+if (false) {
+    Shutdown::addCallback(
+        static function (): void {
+        },
+        'duration'
+    );
+}
 
 $session  = ROBOT_CONFIG['mp'][0]['session'];
 $settings = ROBOT_CONFIG['mp'][0]['settings'];
 $mp = new API($session, $settings);
 $mp->updateSettings(['logger_level' => Logger::NOTICE]);
 
-Shutdown::addCallback(
-    function () use ($mp, &$signal) {
-        $scriptEndTime = \microTime(true);
-        echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
-        $stopReason = 'nullapi';
-        if ($signal !== null) {
-            $stopReason = $signal;
-        } elseif ($mp) {
-            try {
-                $stopReason = $mp->getEventHandler()->getStopReason();
-                if (false && $stopReason === 'UNKNOWN') {
-                    $error = \error_get_last();
-                    $stopReason = isset($error) ? 'error' : $stopReason;
+if (false) {
+    Shutdown::addCallback(
+        function () use ($mp, &$signal) {
+            $scriptEndTime = \microTime(true);
+            echo (PHP_EOL . 'Shutting down ....<br>' . PHP_EOL);
+            $stopReason = 'nullapi';
+            if ($signal !== null) {
+                $stopReason = $signal;
+            } elseif ($mp) {
+                try {
+                    $stopReason = $mp->getEventHandler()->getStopReason();
+                    if (false && $stopReason === 'UNKNOWN') {
+                        $error = \error_get_last();
+                        $stopReason = isset($error) ? 'error' : $stopReason;
+                    }
+                } catch (\TypeError $e) {
+                    $stopReason = 'sigterm';
                 }
-            } catch (\TypeError $e) {
-                $stopReason = 'sigterm';
             }
-        }
-        echo (PHP_EOL . "Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
-        Logger::log(PHP_EOL . "Shutting down due to '$stopReason' ....", Logger::ERROR);
-        $record   = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
-        Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
-        $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
-        $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!\n\n\n";
-        //Logger::log($msg, Logger::ERROR);
-        error_log($msg);
-    },
-    'duration'
-);
+            echo (PHP_EOL . "Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
+            Logger::log(PHP_EOL . "Shutting down due to '$stopReason' ....", Logger::ERROR);
+            $record   = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
+            Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
+            $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
+            $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!\n\n\n";
+            //Logger::log($msg, Logger::ERROR);
+            error_log($msg);
+        },
+        'duration'
+    );
+}
 
 $authState = authorizationState($mp);
 error_log("Authorization State: " . authorizationStateDesc($authState));
