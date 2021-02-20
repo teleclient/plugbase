@@ -53,14 +53,14 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-$signal  = null;
-Loop::run(function () use (&$signal) {
-    if (\defined('SIGINT')) {
+$signal = null;
+if (false && \defined('SIGINT')) {
+    Loop::run(function () use (&$signal) {
         $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
             $signal = 'sigint';
             error_log('Robot received SIGINT signal');
             Logger::log('Robot received SIGINT signal', Logger::ERROR);
-            //Magic::shutdown(1);
+            Magic::shutdown(1);
         });
         Loop::unreference($siginit);
 
@@ -68,11 +68,11 @@ Loop::run(function () use (&$signal) {
             $signal = 'sigterm';
             error_log('Robot received SIGTERM signal');
             Logger::log('Robot received SIGTERM signal', Logger::ERROR);
-            //Magic::shutdown(1);
+            Magic::shutdown(1);
         });
         Loop::unreference($sigterm);
-    }
-});
+    });
+}
 
 Shutdown::addCallback(
     static function (): void {
