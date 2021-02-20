@@ -640,7 +640,7 @@ function checkTooManyRestartsAsync(object $eh, string $startupFilename): \Genera
     }
     $startupsCount0 = count($startups);
 
-    $nowMilli = nowMilli();
+    $nowMilli = intval(microtime(true) * 1000);
     $aMinuteAgo = $nowMilli - 60 * 1000;
     foreach ($startups as $index => $startupstr) {
         $startup = intval($startupstr);
@@ -735,10 +735,13 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $robotConfig = []
         while (true) {
             try {
                 $started = false;
+                $stateBefore = authorizationState($mp);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
                     yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 }
                 $me = yield $mp->start();
+                $stateAfter = authorizationState($mp);
+                yield $mp->logger("Authorization State{Before Start:'$stateBefore', After Start:'$stateAfter'}", Logger::ERROR);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
                     yield $mp->logger("Unsuccessful Login!", Logger::ERROR);
                     throw new ErrorException('Unsuccessful Login!');

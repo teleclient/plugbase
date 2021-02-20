@@ -101,6 +101,8 @@ Shutdown::addCallback(
                 $stopReason = 'sigterm';
             }
         }
+        echo (PHP_EOL . "Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
+        Logger::log(PHP_EOL . "Shutting down due to '$stopReason' ....", Logger::ERROR);
         $record   = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
         Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
         $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
