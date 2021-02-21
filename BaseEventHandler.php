@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use danog\madelineproto\Logger;
 
-require_once         'Plugin.php';
+require_once 'Plugin.php';
 require_once 'AbstractPlugin.php';
-require_once  'plugins/BuiltinPlugin.php';
-require_once     'plugins/YourPlugin.php';
+require_once 'plugins/BuiltinPlugin.php';
+require_once 'plugins/YourPlugin.php';
 
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {

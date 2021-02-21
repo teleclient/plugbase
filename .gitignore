@@ -18,6 +18,8 @@ bot157887279.lock
 
 trace.txt
 error_log
+junk*
+*.log
 
 data/
 config.php

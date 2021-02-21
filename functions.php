@@ -5,6 +5,7 @@ declare(strict_types=1);
 use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
+use \danog\Loop\Generic\GenericLoop;
 use function Amp\File\{get, put, exists, getSize};
 
 function toJSON($var, bool $pretty = true): ?string
@@ -16,6 +17,13 @@ function toJSON($var, bool $pretty = true): ?string
     $json = \json_encode($var, $opts | ($pretty ? JSON_PRETTY_PRINT : 0));
     $json = ($json !== '') ? $json : var_export($var, true);
     return ($json != false) ? $json : null;
+}
+
+if (!function_exists('str_contains')) {
+    function str_contains(string $haystack, string $needle): bool
+    {
+        return '' === $needle || false !== strpos($haystack, $needle);
+    }
 }
 
 function strStartsWith(string $haystack, string $needle, bool $caseSensitive = true): bool
@@ -681,16 +689,16 @@ function checkTooManyRestarts(string $startupFilename): int
     return $restartsCount;
 }
 
-function myStartAndLoop(API $MadelineProto, string $eventHandler, \danog\Loop\Generic\GenericLoop $genLoop = null, int $maxRecycles = 10): void
+function myStartAndLoop(API $MadelineProto, string $eventHandler, array $genLoops = [], int $maxRecycles = 10): void
 {
     $maxRecycles  = 10;
     $recycleTimes = [];
     while (true) {
         try {
-            $MadelineProto->loop(function () use ($MadelineProto, $eventHandler, $genLoop) {
+            $MadelineProto->loop(function () use ($MadelineProto, $eventHandler, $genLoops) {
                 yield $MadelineProto->start();
                 yield $MadelineProto->setEventHandler($eventHandler);
-                if ($genLoop !== null) {
+                foreach ($genLoops as $genLoop) {
                     $genLoop->start(); // Do NOT use yield.
                 }
 
@@ -726,20 +734,24 @@ function myStartAndLoop(API $MadelineProto, string $eventHandler, \danog\Loop\Ge
     };
 }
 
-function safeStartAndLoop(API $mp, string $eventHandler, array $robotConfig = [], array $genLoops = []): void
+function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): void
 {
     $mp->async(true);
-    $mp->__set('config', $robotConfig);
-    $mp->loop(function () use ($mp, $eventHandler, $robotConfig, $genLoops) {
+    //$mp->__set('config', $robotConfig);
+    $mp->loop(function () use ($mp, $eventHandler, $genLoops) {
         $errors = [];
         while (true) {
             try {
                 $started = false;
+                /*
                 $stateBefore = authorizationState($mp);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
                     yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 }
+                */
                 $me = yield $mp->start();
+                /*
+                yield $mp->logger("Authorization State: {Before Start:'$stateBefore'}", Logger::ERROR);
                 $stateAfter = authorizationState($mp);
                 yield $mp->logger("Authorization State{Before Start:'$stateBefore', After Start:'$stateAfter'}", Logger::ERROR);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
@@ -751,6 +763,7 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $robotConfig = []
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
+                */
                 yield $mp->setEventHandler($eventHandler);
                 //$eh = $mp->getEventHandler($eventHandler);
                 foreach ($genLoops as $genLoop) {

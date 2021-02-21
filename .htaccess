@@ -14,13 +14,13 @@ php_value max_execution_time 0
 #php_value upload_max_filesize 64M
 #php_value post_max_size 64M
 #php_value max_input_time 1000
-php_value error_log  /home/u176105864/domains/tlgbots.com/public_html/plugbase/PHP_errors.log
+#php_value error_log  /home/u176105864/domains/tlgbots.com/public_html/plugbase/PHP_errors.log
 #php_value error_log  /home/esfand/devphp/teleclient_plugbase/PHP_errors.log
 
 # Uncomment the following three lines for Hostinger
 SecFilterEngine   Off
 SecFilterScanPOST Off
-Header always set Content-Security-Policy: upgrade-insecure-requests
+#Header always set Content-Security-Policy: upgrade-insecure-requests
 
 RewriteEngine on
 RewriteRule .* - [E=noconntimeout:1]
