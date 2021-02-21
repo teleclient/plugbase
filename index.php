@@ -28,9 +28,12 @@ define("STARTUPS_FILE",  \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
 define("LAUNCHES_FILE",  \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
 
 $userDate = new \UserDate(ROBOT_CONFIG['zone']);
+
 Magic::classExists();
 \error_clear_last();
-Logger::constructorFromSettings(ROBOT_CONFIG['mp'][0]['settings']);
+$cl = Logger::getLoggerFromSettings(ROBOT_CONFIG['mp'][0]['settings']);
+//Logger::$default = null;
+//$cl->logger('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 
 $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
@@ -91,6 +94,17 @@ $mp = new API($session, $settings);
 
 if ($signalHandler) {
     Shutdown::addCallback(
+        static function (): void {
+            Logger:
+            log("I'm dead now!", Logger::ERROR);
+            echo ("I'm dead now!" . PHP_EOL);
+        },
+        'final'
+    );
+}
+
+if ($signalHandler) {
+    Shutdown::addCallback(
         function () use ($mp, &$signal) {
             $scriptEndTime = \microTime(true);
             $stopReason = 'nullapi';
@@ -123,9 +137,9 @@ if ($signalHandler) {
                 // API is not instansiated
                 $stopReason = 'shit';
             }
-            echo (PHP_EOL . "Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
-            Logger::log(PHP_EOL . "Shutting down due to '$stopReason' ....", Logger::ERROR);
-            $record   = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
+            echo ("Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
+            Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
+            $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
             Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
             $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
             $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!";
