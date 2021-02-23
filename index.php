@@ -16,10 +16,12 @@ require_once 'functions.php';
 initPhp();
 includeMadeline('phar');
 require_once 'UserDate.php';
+require_once 'FilteredLogger.php';
 require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
-define('ROBOT_CONFIG',   include('config.php'));
+$robotConfig = include('config.php');
+
 define("MEMORY_LIMIT",   \ini_get('memory_limit'));
 define('REQUEST_URL',    \getRequestURL() ?? '');
 define('USER_AGENT',     \getUserAgent() ?? '');
@@ -27,18 +29,18 @@ define("DATA_DIRECTORY", \makeDataDirectory('data'));
 define("STARTUPS_FILE",  \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
 define("LAUNCHES_FILE",  \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
 
-$userDate = new \UserDate(ROBOT_CONFIG['zone']);
+//var_dump($robotConfig);
+//echo (PHP_EOL . PHP_EOL);
+$filteredLogger = new FilteredLogger($robotConfig, 0);
+//var_dump($robotConfig);
+//echo (PHP_EOL . PHP_EOL);
 
-Magic::classExists();
-\error_clear_last();
-$cl = Logger::getLoggerFromSettings(ROBOT_CONFIG['mp'][0]['settings']);
-//Logger::$default = null;
-//$cl->logger('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
+$userDate = new \UserDate($robotConfig['zone']);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 
 $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
-if ($restartsCount > ROBOT_CONFIG['maxrestarts']) {
-    $text = 'More than ' . ROBOT_CONFIG['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
+if ($restartsCount > $robotConfig['maxrestarts']) {
+    $text = 'More than ' . $robotConfig['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
     Logger::log($text, Logger::ERROR);
     Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
     exit($text . PHP_EOL);
@@ -50,7 +52,7 @@ unset($launch);
 
 if (PHP_SAPI !== 'cli') {
     if (!\getWebServerName()) {
-        \setWebServerName(ROBOT_CONFIG['config->host']);
+        \setWebServerName($robotConfig['config->host']);
         if (!\getWebServerName()) {
             $text = "To enable the restart, the config->host must be defined!";
             echo ($text . PHP_EOL);
@@ -82,61 +84,49 @@ if ($signalHandler && \defined('SIGINT')) {
 if ($signalHandler) {
     Shutdown::addCallback(
         static function (): void {
+            echo ('Oh no!' . PHP_EOL);
         },
         'duration'
     );
 }
 
-$session  = ROBOT_CONFIG['mp'][0]['session'];
-$settings = ROBOT_CONFIG['mp'][0]['settings'];
+$session  = $robotConfig['mp'][0]['session'];
+$settings = $robotConfig['mp'][0]['settings'];
 $mp = new API($session, $settings);
-//$mp->updateSettings(['logger_level' => Logger::NOTICE]);
-
-if ($signalHandler) {
-    Shutdown::addCallback(
-        static function (): void {
-            Logger:
-            log("I'm dead now!", Logger::ERROR);
-            echo ("I'm dead now!" . PHP_EOL);
-        },
-        'final'
-    );
-}
 
 if ($signalHandler) {
     Shutdown::addCallback(
         function () use ($mp, &$signal) {
             $scriptEndTime = \microTime(true);
+            //$e = new \Exception;
+            //Logger::log($e->getTraceAsString(), Logger::ERROR);
             $stopReason = 'nullapi';
+            //var_dump(Tools::getVar($mp->API, 'destructing').PHP_EOL); => bool(false)
             if ($signal !== null) {
                 $stopReason = $signal;
-            } elseif ($mp) {
-                try {
-                    $eh = $mp->getEventHandler();
-                    if ($eh) {
-                        $stopReason = $eh->getStopReason();
-                        if ($stopReason === 'UNKNOWN') {
-                            $error = \error_get_last();
-                            $stopReason = isset($error) ? 'error' : $stopReason;
-                            $stopReason = 'shit';
-                        }
-                    } else {
-                        $error = \error_get_last();
-                        $stopReason = isset($error) ? 'error' : $stopReason;
-                        $stopReason = 'fk';
-                    }
-                } catch (\TypeError $e) {
-                    // No EventHandler is set yet.
+            } elseif (!$mp) {
+                // The external API class is not instansiated
+                $stopReason = 'nullapi';
+            } elseif (!isset($mp->API)) {
+                $stopReason = 'destruct';
+            } elseif (!$mp->API->event_handler) {
+                // EventHandler is not set
+                // Is shutdown during the start() function execution
+                $error = \error_get_last();
+                $stopReason = isset($error) ? 'error' : 'destruct';
+            } else {
+                // EventHandler is set and instantiated
+                $eh = $mp->getEventHandler();
+                $stopReason = $eh->getStopReason();
+                if ($stopReason === 'UNKNOWN') {
                     $error = \error_get_last();
                     if (isset($error)) {
-                        Logger::log("LAST PHP ERROR: " . toJSON($error));
+                        Logger::log("LAST PHP ERROR: " . toJSON($error), Logger::ERROR);
                     }
-                    $stopReason = 'oops';
+                    $stopReason = isset($error) ? 'error' : $stopReason;
                 }
-            } else {
-                // API is not instansiated
-                $stopReason = 'shit';
             }
+
             echo ("Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
             Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
             $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
@@ -158,7 +148,7 @@ if ($authState === 4) {
 Logger::log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'), Logger::ERROR);
 */
 //safeStartAndLoop($mp, BaseEventHandler::class);
-$mp2 = $mp;
+
 $mp->startAndLoop(BaseEventHandler::class);
 
 echo ('Bye, bye!<br>' . PHP_EOL);

@@ -11,8 +11,6 @@ require_once 'plugins/YourPlugin.php';
 
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {
-    static array $robotConfig1;
-
     private BuiltinPlugin $builtinPlugin;
     private    YourPlugin $yourPlugin;
 
@@ -30,6 +28,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
         parent::__construct($apiWrapper);
+        $this->robotConfig = $GLOBALS['robotConfig'];
+
         $now = microtime(true);
         $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
 
@@ -37,12 +37,11 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->handlerUnserialized = $now;
         $this->scriptStarted       = SCRIPT_START_TIME;
 
-        $this->userDate    = new \UserDate(ROBOT_CONFIG['zone']);
-        $this->robotConfig = ROBOT_CONFIG;
+        $this->userDate    = new \UserDate($this->robotConfig['zone']);
         $this->canExecute  = false;
         $this->stopReason  = "UNKNOWN";
 
-        Logger::log(toJSON(ROBOT_CONFIG));
+        Logger::log(toJSON($this->robotConfig));
         Logger::Log("EventHandler instantiated at " . $this->userDate->format($now), Logger::ERROR);
         Logger::log("EventHandler Update Run Record: " . toJSON($record), Logger::ERROR);
 
@@ -55,7 +54,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->scriptStarted  = SCRIPT_START_TIME;
         $now = microtime(true);
         $this->handlerUnserialized = $now;
-        $userDate = new \UserDate(ROBOT_CONFIG['zone']);
+        $userDate = new \UserDate($this->robotConfig['zone']);
         Logger::log('EventHandler unserialized at ' . $userDate->format($now), Logger::ERROR);
 
         $this->canExecute = false;
