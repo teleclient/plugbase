@@ -111,8 +111,8 @@ class FilteredLogger
         ];
         return $settings;
     }
+    */
 }
-*/
 
 /*
 \sprintf(

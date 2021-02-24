@@ -64,22 +64,40 @@ if (PHP_SAPI !== 'cli') {
 $signalHandler = true;
 $signal = null;
 if ($signalHandler && \defined('SIGINT')) {
-    Loop::run(function () use (&$signal) {
-        $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
-            $signal = 'sigint';
-            Logger::log('Robot received SIGINT signal', Logger::ERROR);
-            Magic::shutdown(1);
-        });
-        Loop::unreference($siginit);
+    try {
+        Loop::run(function () use (&$signal) {
+            $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
+                $signal = 'sigint';
+                Logger::log('Robot received SIGINT signal', Logger::ERROR);
+                Magic::shutdown(1);
+            });
+            Loop::unreference($siginit);
 
-        $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
-            $signal = 'sigterm';
-            Logger::log('Robot received SIGTERM signal', Logger::ERROR);
-            Magic::shutdown(1);
+            $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
+                $signal = 'sigterm';
+                Logger::log('Robot received SIGTERM signal', Logger::ERROR);
+                Magic::shutdown(1);
+            });
+            Loop::unreference($sigterm);
         });
-        Loop::unreference($sigterm);
-    });
+    } catch (\Throwable $e) {
+    }
 }
+
+if (false && \defined('SIGINT')) {
+    try {
+        Loop::unreference(Loop::onSignal(SIGINT, static function () {
+            Logger::log('Got sigint', Logger::FATAL_ERROR);
+            Magic::shutdown(1);
+        }));
+        Loop::unreference(Loop::onSignal(SIGTERM, static function () {
+            Logger::log('Got sigterm', Logger::FATAL_ERROR);
+            Magic::shutdown(1);
+        }));
+    } catch (\Throwable $e) {
+    }
+}
+
 
 if ($signalHandler) {
     Shutdown::addCallback(
@@ -116,6 +134,7 @@ if ($signalHandler) {
                 $stopReason = isset($error) ? 'error' : 'destruct';
             } else {
                 // EventHandler is set and instantiated
+                echo ('We are here!' . PHP_EOL);
                 $eh = $mp->getEventHandler();
                 $stopReason = $eh->getStopReason();
                 if ($stopReason === 'UNKNOWN') {
@@ -149,7 +168,10 @@ Logger::log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'), Logger::
 */
 //safeStartAndLoop($mp, BaseEventHandler::class);
 
-$mp->startAndLoop(BaseEventHandler::class);
+$mp->loop(function () use ($mp) {
+    //$mp->start();
+});
+//$mp->startAndLoop(BaseEventHandler::class);
 
 echo ('Bye, bye!<br>' . PHP_EOL);
 Logger::log('Bye, bye!', Logger::ERROR);
