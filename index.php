@@ -14,7 +14,7 @@ define('SCRIPT_INFO',       'BASE_P V1.0.0'); // <== Do not change!
 
 require_once 'functions.php';
 initPhp();
-includeMadeline('phar');
+includeMadeline('composer');
 require_once 'UserDate.php';
 require_once 'FilteredLogger.php';
 require_once 'Launch.php';
@@ -29,11 +29,7 @@ define("DATA_DIRECTORY", \makeDataDirectory('data'));
 define("STARTUPS_FILE",  \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
 define("LAUNCHES_FILE",  \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
 
-//var_dump($robotConfig);
-//echo (PHP_EOL . PHP_EOL);
 $filteredLogger = new FilteredLogger($robotConfig, 0);
-//var_dump($robotConfig);
-//echo (PHP_EOL . PHP_EOL);
 
 $userDate = new \UserDate($robotConfig['zone']);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
@@ -169,7 +165,7 @@ Logger::log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'), Logger::
 //safeStartAndLoop($mp, BaseEventHandler::class);
 
 $mp->loop(function () use ($mp) {
-    //$mp->start();
+    yield $mp->start();
 });
 //$mp->startAndLoop(BaseEventHandler::class);
 
