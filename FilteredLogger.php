@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use danog\MadelineProto\Logger;
+use danog\MadelineProto\Shutdown;
 use danog\MadelineProto\Magic;
 
 class FilteredLogger
@@ -47,51 +48,96 @@ class FilteredLogger
 
     public function __invoke($entry, int $level): void
     {
-        try {
-            if (\is_array($entry)) {
-                $entry = toJSON($entry);
-            } elseif (\is_object($entry)) {
-                // Parse the regular or Throwable Object
-                $class = get_class($entry);
-                $type = strEndsWith($class, 'Exception') ? 'EXCEPTION' : 'OBJECT';
-                $entry = "'$class' $type: " . (string)$entry;
-            } elseif (!\is_string($entry)) {
-                // Anything but string
-                $entry = "?????: " . (string)$entry;
-            } else if (substr($entry, 0, 11) === 'Rejecting: ') {
-                if (substr($entry, 11, 32) === 'Telegram returned an RPC error: ') {
-                    $this->rpcException($entry, $level);
-                    //Parse the RPCException
-                    $pattern = "/^(.*) \((\d*)\) *\((.*)\), caused by (.*)<br>.*\['(.*)'\]<br>/s";
-                    $pattern = "/^(.*) \((\d*)\) *\((.*)\), caused by (.*):(\d*).*\n\n\n.*\n\['(.*)'].*/s";
-                    $text = substr($entry, 43);
-                    //$this->filteredLog->logger($this->levelDescr(1) . ": " . $pattern, 1);
-                    //$this->filteredLog->logger($this->levelDescr(1) . ": " . $text, 1);
-                    preg_match($pattern, $text, $matches);
-                    $desc   = $matches[1] ?? '__desc__';
-                    $code   = $matches[2] ?? '__code__';
-                    $key    = $matches[3] ?? '__key__';
-                    $method = $matches[6] ?? '__method__';
-                    $error = "Telegram RPC Error: {method:'$method', code:'$code', key:'$key', desc:'$desc'}";
-                    $this->filteredLog->logger($this->levelDescr(1) . ": " . $error, 1);
-                } else {
-                    // Parse the Telegram request
-                    $method = substr($entry, 11);
-                    $entry = "Rejecting: method:'$method'";
-                }
-                $level = 1;
+        //try {
+        $file = \basename(\debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['file'], '.php');
+
+        if (\is_array($entry)) {
+            $entry = toJSON($entry);
+        } elseif (\is_object($entry)) {
+            // Parse the regular or Throwable Object
+            $class = get_class($entry);
+            $type = strEndsWith($class, 'Exception') ? 'EXCEPTION' : 'OBJECT';
+            if ($type === 'EXCEPTION') {
+                $this->parseException($entry, $level, $class);
             } else {
-                // Regular string entry
+                $this->parseObject($entry, $level, $class);
             }
-        } catch (Throwable $e) {
-            throw new Exception($e->getMessage());
+            $entry = "'$class' $type: " . (string)$entry;
+        } elseif (!\is_string($entry)) {
+            // Anything but string
+            $entry = "?????: " . (string)$entry;
+        } else if (substr($entry, 0, 11) === 'Rejecting: ') {
+            if (substr($entry, 11, 32) === 'Telegram returned an RPC error: ') {
+                //Parse the RPCException
+                $this->parseRpcException($entry, $level, 'rejecting');
+            } else {
+                // Parse the Telegram request
+                $method = substr($entry, 11);
+                $entry = "Rejecting: method:'$method'";
+            }
+            $level = 1;
+        } else {
+            // Regular string entry
+            if (strEndsWith($entry, 'Enabled PHP logging')) {
+                $this->filteredLog->logger("Deleted: $entry", $level, $file);
+                return;
+            } elseif (strpos($entry, 'Auth key not registered, resetting temporary and permanent auth keys...') !== false) {
+                $level = 0;
+            } elseif (strpos($entry, 'Could not resend req_') !== false) {
+                $this->filteredLog->logger($entry, 0, $file);
+                $this->filteredLog->logger("Session was terminated!", 0, $file);
+                Shutdown::removeCallback('duration');
+                Shutdown::removeCallback('restarter');
+                Shutdown::removeCallback(0);
+                Shutdown::removeCallback(1);
+                Shutdown::removeCallback(2);
+                Shutdown::removeCallback(3);
+                $buffer = @\ob_get_clean() ?: '';
+                $buffer .= '<html><body><h1>' . \htmlentities("Session was terminated!") . '</h1></body></html>';
+                \ignore_user_abort(true);
+                \header('Connection: close');
+                \header('Content-Type: text/html');
+                echo $buffer;
+                \flush();
+                exit(0);
+            }
         }
-        $this->filteredLog->logger($this->levelDescr($level) . ": " . $entry, 1);
+        //} catch (Throwable $e) {
+        //throw new Exception($e->getMessage());
+        //}
+        $entry = $this->levelDescr($level) . ": " . $entry;
+        $this->filteredLog->logger($entry, $level, $file);
         return;
     }
 
-    private function rpcException(string $entry, int $level): void
+    private function parseObject(object $entry, int $level, string $class = '')
     {
+    }
+
+
+    private function parseException(object $entry, int $level, string $class = '')
+    {
+    }
+
+    private function parseRpcException(string $entry, int $level, string $label = ''): array
+    {
+        //Parse the RPCException
+        if (PHP_SAPI === 'cli') {
+            $pattern = "/^(.*) \((\d*)\) *\((.*)\).*(.*):(\d*)\n.*\['(.*)']\n/sU";
+        } else {
+            $pattern = "/^(.*) \((\d*)\) *\((.*)\), caused by (.*):(\d*)<br>.*\['(.*)'\]<br><br>/sU";
+        }
+        $text = substr($entry, 43);
+        preg_match($pattern, $text, $matches);
+        $exception['label']  = $label;
+        $exception['desc']   = $matches[1] ?? '__desc__';
+        $exception['code']   = $matches[2] ?? '__code__ ';
+        $exception['key']    = $matches[3] ?? '__key__';
+        $exception['file']   = $matches[4] ?? '__file__ ';
+        $exception['line']   = $matches[5] ?? '__line__';
+        $exception['method'] = $matches[6] ?? '__method__';
+        $this->filteredLog->logger($this->levelDescr(1) . ": " . 'RPCException: ' . toJSON($exception), 1);
+        return $exception;
     }
 
     private function levelDescr(int $level): string

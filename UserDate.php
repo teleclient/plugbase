@@ -41,6 +41,9 @@ class UserDate
     public static function duration(float $startTime, float $endTime = null): string
     {
         $endTime = $endTime ?? microtime(true);
+        if ($endTime < 10) {
+            return 'UNAVAILABLE';
+        }
 
         $diff = $endTime - $startTime;
 

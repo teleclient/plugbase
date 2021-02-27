@@ -100,9 +100,6 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
 
         extract($vars);
 
-        $msgFront = substr(\str_replace(array("\r", "\n"), '<br>', $msgText), 0, 60);
-        yield $eh->logger(($vars['execute'] ? 'new: ' : 'old: ') . $msgFront, Logger::ERROR);
-
         $executed = false;
         switch ($fromRobot ? $verb : '') {
             case '':
@@ -135,17 +132,21 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $sessionSize     = formatBytes(getFileSize($eh->getSessionName()), 3);
                 $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
                 if ($launch) {
-                    $lastEndTime        = $eh->formatTime($launch['time_end']);
-                    $lastLaunchMethod   = $launch['launch_method'];
-                    $lastLaunchDuration = \UserDate::duration($launch['time_start'], $launch['time_end']);
-                    $lastPeakMemory     = formatBytes($launch['memory_end']);
+                    $lastStartTime        = $eh->formatTime($launch['time_start']);
+                    $lastEndTime          = $eh->formatTime($launch['time_end']);
+                    $lastDowntimeDuration = \UserDate::duration($launch['time_end'], $eh->getScriptStarted());
+                    $lastLaunchMethod     = $launch['launch_method'];
+                    $lastLaunchDuration   = \UserDate::duration($launch['time_start'], $launch['time_end']);
+                    $lastPeakMemory       = formatBytes($launch['memory_end']);
                 } else {
-                    $lastEndTime        = 'UNAVAILABLE';
-                    $lastLaunchMethod   = 'UNAVAILABLE';
-                    $lastLaunchDuration = 'UNAVAILABLE';
-                    $lastPeakMemory     = 'UNAVAILABLE';
+                    $lastDowntimeDuration = 'UNAVAILABLE';
+                    $lastStartTime        = 'UNAVAILABLE';
+                    $lastEndTime          = 'UNAVAILABLE';
+                    $lastLaunchMethod     = 'UNAVAILABLE';
+                    $lastLaunchDuration   = 'UNAVAILABLE';
+                    $lastPeakMemory       = 'UNAVAILABLE';
                 }
-                $notif = $this->getNotif();
+                $notif      = $this->getNotif();
                 $notifState = substr($notif, 0, 2) === 'on' ? 'ON' : 'OFF';
                 $notifAge   = $notifState === 'OFF' ? '' : (strlen($notif) <= 3 ? ' / Never wipe' : (' / Wipe after ' . substr($notif, 3) . ' secs'));
                 $notifStr   = "$notifState$notifAge";
@@ -155,9 +156,10 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: $robotId<br>";
-                $status .= "Session Age: "      . \UserDate::duration($eh->getSessionCreated(),      $now) . "<br>";
-                $status .= "Script Age: "       . \UserDate::duration($eh->getScriptStarted(),       $now) . "<br>";
-                $status .= "API Instance Age: " . \UserDate::duration($eh->getHandlerUnserialized(), $now) . "<br>";
+                //$status .= "Session Age: "            . \UserDate::duration($eh->getSessionCreated(),      $now) . "<br>";
+                $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),       $now) . "<br>";
+                $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),  $now) . "<br>";
+                //$status .= "Handler Unserialized Age: " . \UserDate::duration($eh->getHandlerUnserialized(), $now) . "<br>";
                 $status .= "Peak Memory: $peakMemUsage<br>";
                 $status .= "Current Memory: $currentMemUsage<br>";
                 $status .= "Allowed Memory: $memoryLimit<br>";
@@ -165,9 +167,10 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= "Session Size: $sessionSize<br>";
                 $status .= 'Time: ' . $eh->getZone() . ' ' . $eh->formatTime() . '<br>';
                 $status .= 'Updates Processed: ' . $this->totalUpdates . '<br>';
-                //$status .= 'Loop State: ' . ($eh->getLoopState() ? 'ON' : 'OFF') . '<br>';
                 $status .= 'Notification: ' . $notifStr . PHP_EOL;
                 $status .= 'Launch Method: ' . \getLaunchMethod() . '<br>';
+                $status .= 'Last Downtime Duration: '   . $lastDowntimeDuration . '<br>';
+                $status .= 'Previous Start Time: '      . $lastStartTime . '<br>';
                 $status .= 'Previous Stop Time: '       . $lastEndTime . '<br>';
                 $status .= 'Previous Launch Method: '   . $lastLaunchMethod . '<br>';
                 $status .= 'Previous Launch Duration: ' . $lastLaunchDuration . '<br>';

@@ -13,7 +13,7 @@ class Launch
 
     public static function appendLaunchRecord(string $fileName, float $scriptStartTime, string $stopReason): array
     {
-        $key = self::microtimeToStr($scriptStartTime);
+        $key = self::floatToIntStr($scriptStartTime);
 
         $record['time_start']    = $key;
         $record['time_end']      = 0;
@@ -34,7 +34,7 @@ class Launch
 
     public static function updateLaunchRecord(string $fileName, float $scriptStartTime): array
     {
-        $key = self::microtimeToStr($scriptStartTime);
+        $key = self::floatToIntStr($scriptStartTime);
 
         $record = null;
         $new    = null;
@@ -65,13 +65,13 @@ class Launch
         //yield Amp\File\put($fileName, rtrim($content));
 
         $record['time_start'] = $scriptStartTime;
-        $record['time_end']   = self::microtimeFromStr($items[1]);
+        $record['time_end']   = (float)0; //self::floatFromIntStr($items[1]);
         return $record;
     }
 
     public static function finalizeLaunchRecord(string $fileName, float $scriptStartTime, float $scriptEndTime, string $stopReason): array
     {
-        $key = self::microtimeToStr($scriptStartTime);
+        $key = self::floatToIntStr($scriptStartTime);
 
         $record = null;
         $new    = null;
@@ -82,7 +82,7 @@ class Launch
             if (strStartsWith($line, $key . ' ')) {
                 $items = explode(' ', $line);
                 $record['time_start']    = intval($items[0]);
-                $record['time_end']      = self::microtimeToStr($scriptEndTime);
+                $record['time_end']      = self::floatToIntStr($scriptEndTime);
                 $record['launch_method'] = $items[2];
                 $record['stop_reason']   = $stopReason;
                 $record['memory_start']  = intval($items[4]);
@@ -107,7 +107,7 @@ class Launch
 
     public static function getPreviousLaunch(object $eh, string $fileName, float $scriptStartTime): \Generator
     {
-        $key = self::microtimeToStr($scriptStartTime);
+        $key = self::floatToIntStr($scriptStartTime);
 
         $content = yield get($fileName);
         if ($content === '') {
@@ -130,8 +130,8 @@ class Launch
         if (count($fields) !== 7) {
             throw new \ErrorException("Invalid launch information .");
         }
-        $launch['time_start']    = self::microtimeFromStr($fields[0]);
-        $launch['time_end']      = self::microtimeFromStr($fields[1]);
+        $launch['time_start']    = self::floatFromIntStr($fields[0]);
+        $launch['time_end']      = self::floatFromIntStr($fields[1]);
         $launch['launch_method'] = $fields[2];
         $launch['stop_reason']   = $fields[3];
         $launch['memory_start']  = intval($fields[4]);
@@ -140,17 +140,31 @@ class Launch
         return $launch;
     }
 
+    public static function floatToDate(array $record, UserDate $userDate): array
+    {
+        $record['time_start'] = $userDate->format($record['time_start']);
+        $timeEnd = $record['time_end'];
+        if ($timeEnd < 1) {
+            $record['time_end'] = 'UNAVAILABLE';
+        } else {
+            $record['time_end'] = $userDate->format($record['time_end']);
+        }
+        //echo ("Time End: '" . $record['time_end'] . "'" . PHP_EOL);
+        //$record['time_end'] = $record['time_end'] === 0 ? 'UNAVAILABLE' : ($userDate->format($record['time_end']));
+        return $record;
+    }
+
     private static function makeLine(array $record): string
     {
         return "{$record['time_start']} {$record['time_end']} {$record['launch_method']} {$record['stop_reason']} {$record['memory_start']} {$record['memory_middle']} {$record['memory_end']}";
     }
 
-    private static function microtimeToStr(float $microtime): string
+    private static function floatToIntStr(float $microtime): string
     {
         return strval(intval(round($microtime * 1000 * 1000)));
     }
 
-    private static function microtimeFromStr(string $strMicrotime): float
+    private static function floatFromIntStr(string $strMicrotime): float
     {
         //return strval(intval(round($microtime * 1000 * 1000)));
         return round(intval($strMicrotime) / 1000000);

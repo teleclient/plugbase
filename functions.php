@@ -5,6 +5,7 @@ declare(strict_types=1);
 use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
+use danog\madelineproto\MTProto;
 use \danog\Loop\Generic\GenericLoop;
 use function Amp\File\{get, put, exists, getSize};
 
@@ -469,6 +470,11 @@ function authorizationStateDesc(int $authorized): string
     }
 }
 
+function problematicAccount(object $api): bool
+{
+    return authorizationState($api) === MTProto::LOGGED_IN && !$api->hassAllAuth();
+}
+
 function respond(object $eh, array $peer, int $msgId, string $text, bool $edit = null): \Generator
 {
     $edit = $edit ?? $eh->getEditMessage();
@@ -797,4 +803,16 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
             }
         }
     });
+}
+
+function simpleStartAndLoop(API $mp, string $eventHandler): void
+{
+    $mp->async(true);
+    $mp->loop(function () use ($mp, $eventHandler) {
+        yield $mp->start();
+        \error_clear_last();
+        $mp->setEventHandler($eventHandler);
+        \error_clear_last();
+    });
+    $mp->loop();
 }

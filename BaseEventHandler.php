@@ -14,8 +14,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     private BuiltinPlugin $builtinPlugin;
     private    YourPlugin $yourPlugin;
 
-    private float $sessionCreated;
-    private float $scriptStarted;
+    private float $handlerConstructed;
     private float $handlerUnserialized;
 
     private array    $robotConfig;
@@ -24,47 +23,48 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     private UserDate $userDate;
     private bool     $canExecute;
     private string   $stopReason;
+    private string   $prefixes;
 
     function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
         parent::__construct($apiWrapper);
+
         $this->robotConfig = $GLOBALS['robotConfig'];
 
         $now = microtime(true);
-        $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
 
-        $this->sessionCreated      = $now;
+        $this->handlerConstructed  = $now;
         $this->handlerUnserialized = $now;
-        $this->scriptStarted       = SCRIPT_START_TIME;
 
-        $this->userDate    = new \UserDate($this->robotConfig['zone']);
-        $this->canExecute  = false;
-        $this->stopReason  = "UNKNOWN";
-
-        Logger::log(toJSON($this->robotConfig));
-        Logger::Log("EventHandler instantiated at " . $this->userDate->format($now), Logger::ERROR);
-        Logger::log("EventHandler Update Run Record: " . toJSON($record), Logger::ERROR);
+        $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
+        $this->userDate = new \UserDate($this->robotConfig['zone']);
+        Logger::Log("EventHandler constructed at " . $this->userDate->format($now), Logger::ERROR);
 
         $this->builtinPlugin = new BuiltinPlugin($this);
         $this->yourPlugin    = new    YourPlugin($this);
     }
 
-    public function __wakeup()
+    public function __wakeup_SAVED()
     {
-        $this->scriptStarted  = SCRIPT_START_TIME;
-        $now = microtime(true);
-        $this->handlerUnserialized = $now;
-        $userDate = new \UserDate($this->robotConfig['zone']);
-        Logger::log('EventHandler unserialized at ' . $userDate->format($now), Logger::ERROR);
+        $this->robotConfig = $GLOBALS['robotConfig'];
 
-        $this->canExecute = false;
-        $this->stopReason = "UNKNOWN";
+        $now = microtime(true);
+
+        $this->handlerUnserialized = $now;
+
+        $this->userDate = new \UserDate($this->robotConfig['zone']);
+        Logger::log('EventHandler unserialized at ' . $this->userDate->format($now), Logger::ERROR);
     }
 
     public function onStart(): \Generator
     {
-        $dateStr = $this->formatTime($this->getHandlerUnserialized());
-        yield $this->logger("Event Handler instantiated at $dateStr!", Logger::ERROR);
+        $this->canExecute = false;
+        $this->stopReason = "UNKNOWN";
+
+        $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
+        $record = \Launch::floatToDate($record, $this->userDate);
+        Logger::log(toJSON($this->robotConfig));
+        Logger::log("EventHandler Update Run Record: " . toJSON($record, false), Logger::ERROR);
 
         $start = $this->formatTime(microtime(true));
         yield $this->logger("EventHandler::onStart executed at $start", Logger::ERROR);
@@ -75,18 +75,34 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         if (method_exists('BuiltinPlugin', 'onStart')) {
             yield $this->builtinPlugin->onStart($this);
         }
-        if (method_exists('YouPlugin', 'onStart')) {
+        if (method_exists('YourPlugin', 'onStart')) {
             yield $this->yourPlugin->onStart($this);
         }
     }
 
     public function onAny(array $update): \Generator
     {
-        if (!$this->canExecute && $this->newMessage($update)) {
-            $this->canExecute = true;
-            yield $this->logger('Command-Processing engine started at ' . $this->formatTime(), Logger::ERROR);
-        }
+        $verb = $this->possiblyVerb($update, $this->getPrefixes(), 30);
+        $isNew = floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
+        if (!$this->canExecute && $verb !== '' && $this->newMessage($update)) {
+            $this->newMessage($update);
 
+
+            $this->canExecute = true;
+            $this->logger('Command-Processing engine started at ' . $this->formatTime(), Logger::ERROR);
+        }
+        $vars = ['verb' => $verb];
+        if ($verb !== '') {
+            $msgDate   = floatval($update['message']['date']) + 0.1000000;
+            $msgDate   = $this->formatTime($msgDate);
+            $nowDate   = $this->formatTime(\microtime(true));
+            $startDate = $this->formatTime($this->getScriptStarted());
+            $age = $this->canExecute() ? 'new' : 'old';
+            $this->logger("$age verb:$verb, msg:$msgDate, start:$startDate, now:$nowDate", Logger::ERROR);
+            if ($age === 'new') {
+                //$vars = computeVars($update, $this);
+            }
+        }
         $vars = computeVars($update, $this);
 
         $processed = yield ($this->builtinPlugin)($update, $vars, $this);
@@ -141,7 +157,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     }
     function formatTime(float $microtime = null, string $format = 'H:i:s.v'): string
     {
-        return $this->userDate->format($microtime ?? \microtime(true), $format);
+        $microtime = $microtime ?? \microtime(true);
+        return $microtime < 100 ? 'UNAVAILABLE' : ($this->userDate->format($microtime, $format));
     }
 
     public function canExecute(): bool
@@ -165,23 +182,28 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     function getSessionName(): string
     {
-        return $this->robotConfig['mp']['0']['session'];
+        return $this->robotConfig['mp']['0']['session'] ?? 'madeline.madeline';
     }
 
     function getPrefixes(): string
     {
-        return $this->getRobotConfig()['prefixes'] ?? '/!';
+        return $this->prefixes;
     }
 
-    function getSessionCreated(): float
-    {
-        return $this->sessionCreated ?? 0;
-    }
+    //function getSessionCreated(): float
+    //{
+    //    return $this->sessionCreated ?? 0;
+    //}
 
     function getScriptStarted(): float
     {
-        return $this->scriptStarted;
+        return SCRIPT_START_TIME; // $this->scriptStarted;
     }
+    function getHandlerConstructed(): float
+    {
+        return $this->handlerConstructed;
+    }
+
     function getHandlerUnserialized(): float
     {
         return $this->handlerUnserialized;
@@ -194,8 +216,21 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     function newMessage(array $update): bool
     {
-        $msgDate    = $update['message']['date'] ?? 0;
-        $newMessage = $msgDate >= intval($this->scriptStarted);
-        return $newMessage;
+        return floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
+    }
+
+    private function possiblyVerb(array $update, string $prefixes = '!/', int $maxlen = 20): string
+    {
+        if ($update['_'] === 'updateNewMessage' && isset($update['message']['message'])) {
+            $msg = $update['message']['message'];
+            if (strlen($msg) >= 2 && strpos($prefixes, $msg[0]) !== false) {
+                $spaceloc = strpos($msg, ' ');
+                $verb = !$spaceloc ? substr($msg, 1) : substr($msg, 1, $spaceloc);
+                if (strlen($verb) < $maxlen && ctype_alnum(str_replace('_', '', $verb))) {
+                    return $verb;
+                }
+            }
+        }
+        return '';
     }
 }

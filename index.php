@@ -29,21 +29,53 @@ define("DATA_DIRECTORY", \makeDataDirectory('data'));
 define("STARTUPS_FILE",  \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
 define("LAUNCHES_FILE",  \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
 
-$filteredLogger = new FilteredLogger($robotConfig, 0);
+$signalHandler = true;
+$signal        = null;
+
+if ($signalHandler && \defined('SIGINT')) {
+    try {
+        Loop::run(function () use (&$signal) {
+            $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
+                $signal = 'sigint';
+                Logger::log('Robot received SIGINT signal', Logger::FATAL_ERROR);
+                Magic::shutdown(1);
+            });
+            Loop::unreference($siginit);
+
+            $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
+                $signal = 'sigterm';
+                Logger::log('Robot received SIGTERM signal', Logger::FATAL_ERROR);
+                Magic::shutdown(1);
+            });
+            Loop::unreference($sigterm);
+        });
+    } catch (\Throwable $e) {
+    }
+}
+
+if ($robotConfig['mp'][0]['filterlog'] ?? false) {
+    $filteredLogger = new FilteredLogger($robotConfig, 0);
+} else {
+    $logger = Logger::getLoggerFromSettings($robotConfig['mp'][0]['settings']);
+    \error_clear_last();
+}
 
 $userDate = new \UserDate($robotConfig['zone']);
-Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 
 $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
-if ($restartsCount > $robotConfig['maxrestarts']) {
+if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
     $text = 'More than ' . $robotConfig['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
     Logger::log($text, Logger::ERROR);
     Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
     exit($text . PHP_EOL);
 }
 
+Logger::log('', Logger::ERROR);
+Logger::log('=====================================================', Logger::ERROR);
+Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 $launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
-Logger::log("Appended Run Record: " . toJSON($launch), Logger::ERROR);
+$launch = \Launch::floatToDate($launch, $userDate);
+Logger::log("Appended Run Record: " . toJSON($launch, false), Logger::ERROR);
 unset($launch);
 
 if (PHP_SAPI !== 'cli') {
@@ -57,43 +89,21 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-$signalHandler = true;
-$signal = null;
-if ($signalHandler && \defined('SIGINT')) {
-    try {
-        Loop::run(function () use (&$signal) {
-            $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
-                $signal = 'sigint';
-                Logger::log('Robot received SIGINT signal', Logger::ERROR);
-                Magic::shutdown(1);
-            });
-            Loop::unreference($siginit);
-
-            $sigterm = Loop::onSignal(SIGTERM, static function () use (&$signal) {
-                $signal = 'sigterm';
-                Logger::log('Robot received SIGTERM signal', Logger::ERROR);
-                Magic::shutdown(1);
-            });
-            Loop::unreference($sigterm);
-        });
-    } catch (\Throwable $e) {
-    }
-}
-
 if (false && \defined('SIGINT')) {
     try {
-        Loop::unreference(Loop::onSignal(SIGINT, static function () {
+        Loop::unreference(Loop::onSignal(SIGINT, static function () use (&$signal) {
+            $signal = 'sigint';
             Logger::log('Got sigint', Logger::FATAL_ERROR);
             Magic::shutdown(1);
         }));
-        Loop::unreference(Loop::onSignal(SIGTERM, static function () {
+        Loop::unreference(Loop::onSignal(SIGTERM, static function () use (&$signal) {
+            $signal = 'sigterm';
             Logger::log('Got sigterm', Logger::FATAL_ERROR);
             Magic::shutdown(1);
         }));
     } catch (\Throwable $e) {
     }
 }
-
 
 if ($signalHandler) {
     Shutdown::addCallback(
@@ -106,11 +116,14 @@ if ($signalHandler) {
 
 $session  = $robotConfig['mp'][0]['session'];
 $settings = $robotConfig['mp'][0]['settings'];
+\set_error_handler(['\\danog\\MadelineProto\\Exception', 'exceptionErrorHandler']);
+\set_exception_handler(['\\danog\\MadelineProto\\Exception', 'exceptionHandler']);
 $mp = new API($session, $settings);
+\error_clear_last();
 
 if ($signalHandler) {
     Shutdown::addCallback(
-        function () use ($mp, &$signal) {
+        function () use ($mp, &$signal, $userDate) {
             $scriptEndTime = \microTime(true);
             //$e = new \Exception;
             //Logger::log($e->getTraceAsString(), Logger::ERROR);
@@ -127,25 +140,30 @@ if ($signalHandler) {
                 // EventHandler is not set
                 // Is shutdown during the start() function execution
                 $error = \error_get_last();
+                if (isset($error)) {
+                    Logger::log("LAST PHP ERROR: " . toJSON($error), Logger::ERROR);
+                }
                 $stopReason = isset($error) ? 'error' : 'destruct';
             } else {
                 // EventHandler is set and instantiated
-                echo ('We are here!' . PHP_EOL);
                 $eh = $mp->getEventHandler();
                 $stopReason = $eh->getStopReason();
                 if ($stopReason === 'UNKNOWN') {
                     $error = \error_get_last();
                     if (isset($error)) {
                         Logger::log("LAST PHP ERROR: " . toJSON($error), Logger::ERROR);
+                        $stopReason = isset($error) ? 'error' : $stopReason;
+                    } else {
+                        $stopReason = 'exit';
                     }
-                    $stopReason = isset($error) ? 'error' : $stopReason;
                 }
             }
 
-            echo ("Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
+            echo (PHP_EOL . "Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
             Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
             $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
-            Logger::log("Final Update Run Record: " . toJSON($record), Logger::ERROR);
+            $record = \Launch::floatToDate($record, $userDate);
+            Logger::log("Final Update Run Record: " . toJSON($record, false), Logger::ERROR);
             $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
             $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!";
             Logger::log($msg, Logger::ERROR);
@@ -164,10 +182,37 @@ Logger::log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'), Logger::
 */
 //safeStartAndLoop($mp, BaseEventHandler::class);
 
-$mp->loop(function () use ($mp) {
-    yield $mp->start();
-});
-//$mp->startAndLoop(BaseEventHandler::class);
 
+simpleStartAndLoop($mp, BaseEventHandler::class);
+//$mp->startAndLoop(BaseEventHandler::class);
+\error_clear_last();
 echo ('Bye, bye!<br>' . PHP_EOL);
 Logger::log('Bye, bye!', Logger::ERROR);
+
+//\set_error_handler(['\\danog\\MadelineProto\\Exception', 'exceptionErrorHandler']);
+//\set_exception_handler(['\\danog\\MadelineProto\\Exception', 'exceptionHandler']);
+
+function exceptionErrorHandler($errno = 0, $errstr = null, $errfile = null, $errline = null)
+{
+    Logger::log($errstr, Logger::FATAL_ERROR);
+    Magic::shutdown(1);
+    // If error is suppressed with @, don't throw an exception
+    if (
+        \error_reporting() === 0 ||
+        \strpos($errstr, 'headers already sent') ||
+        $errfile && (\strpos($errfile, 'vendor/amphp') !== false || \strpos($errfile, 'vendor/league') !== false)
+    ) {
+        return false;
+    }
+    echo ("errno: $errstr" . PHP_EOL);
+    echo ("errstr: '$errstr??'''" . PHP_EOL);
+    echo ("errfile: '$errfile??'''" . PHP_EOL);
+    echo ("errline: '$errline??'''" . PHP_EOL);
+    throw new \danog\MadelineProto\Exception($errstr, $errno, null, $errfile, $errline);
+}
+
+function exceptionHandler($exception)
+{
+    Logger::log($exception, Logger::FATAL_ERROR);
+    Magic::shutdown(1);
+}
