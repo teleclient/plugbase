@@ -1,5 +1,5 @@
 composer.phar
-composer.lock
+#composer.lock
 /vendor/
 
 madeline.phar
@@ -24,4 +24,3 @@ junk*
 
 data/
 config.php
-bodyIndex.log
