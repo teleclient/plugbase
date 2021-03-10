@@ -11,7 +11,7 @@ use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize};
 
 define("SCRIPT_START_TIME", \microtime(true));
-define('SCRIPT_INFO',       'BASE_P V1.0.0'); // <== Do not change!
+define('SCRIPT_INFO',       'BASE_PLG V1.0.0'); // <== Do not change!
 
 require_once 'functions.php';
 initPhp();
@@ -22,7 +22,6 @@ require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
-error_log(toJSON($robotConfig));
 
 define("MEMORY_LIMIT",   \ini_get('memory_limit'));
 define('REQUEST_URL',    \getRequestURL() ?? '');
@@ -76,13 +75,12 @@ if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
 Logger::log('', Logger::ERROR);
 Logger::log('=====================================================', Logger::ERROR);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
+Logger::log("Configurations: " . toJSON($robotConfig), Logger::ERROR);
 
 if (!acquireBaseLock(getSessionName($robotConfig))) {
     closeConnection("Process already running!");
     exit();
 }
-
-exit();
 
 $launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
 $launch = \Launch::floatToDate($launch, $userDate);
@@ -276,12 +274,11 @@ function acquireBaseLock(string $sessionName): bool
             while (!$locked) {
                 $locked = \flock($lock, LOCK_EX | LOCK_NB);
                 if (!$locked) {
-                    \closeConnection('Bot is already running');
+                    //\closeConnection('Bot is already running');
                     if ($try++ >= 30) {
                         // Log the event.
                         $acquired = false;
                         return $acquired;
-                        exit;
                     }
                     \sleep(1);
                 }
@@ -291,4 +288,5 @@ function acquireBaseLock(string $sessionName): bool
         Logger::log('Bot was continued', Logger::ERROR);
         return $acquired;
     }
+    return $acquired;
 }

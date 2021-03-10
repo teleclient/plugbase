@@ -56,7 +56,7 @@ class FilteredLogger
         } elseif (\is_object($entry)) {
             // Parse the regular or Throwable Object
             $class = get_class($entry);
-            $type = strEndsWith($class, 'Exception') ? 'EXCEPTION' : 'OBJECT';
+            $type = str_ends_with($class, 'Exception') ? 'EXCEPTION' : 'OBJECT';
             if ($type === 'EXCEPTION') {
                 $this->parseException($entry, $level, $class);
             } else {
@@ -78,7 +78,7 @@ class FilteredLogger
             $level = 1;
         } else {
             // Regular string entry
-            if (strEndsWith($entry, 'Enabled PHP logging')) {
+            if (str_ends_with($entry, 'Enabled PHP logging')) {
                 $this->filteredLog->logger("Deleted: $entry", $level, $file);
                 return;
             } elseif (strpos($entry, 'Shutting down MadelineProto (API)') !== false) {
