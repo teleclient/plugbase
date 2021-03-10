@@ -24,3 +24,7 @@ junk*
 
 data/
 config.php
+
+trace.txt
+nbproject/
+.idea/
