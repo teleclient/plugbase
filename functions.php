@@ -27,6 +27,21 @@ if (!function_exists('str_contains')) {
     }
 }
 
+if (!function_exists('str_ends_with')) {
+    function str_ends_with(string $haystack, string $needle): bool
+    {
+        return substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+
+if (!function_exists('str_begins_with')) {
+    function str_begins_with(string $haystack, string $needle): bool
+    {
+        return substr($haystack, strlen($needle)) === $needle;
+    }
+}
+
+/*
 function strStartsWith(string $haystack, string $needle, bool $caseSensitive = true): bool
 {
     $length = strlen($needle);
@@ -43,17 +58,11 @@ function strStartsWith(string $haystack, string $needle, bool $caseSensitive = t
     return false;
 }
 
-function strEndsWith(string $haystack, string $needle, bool $caseSensitive = true): bool
+function strEndsWith(string $haystack, string $needle): bool
 {
-    /*
-    $length = strlen($needle);
-    if (!$length) {
-        return true;
-    }
-    return substr($haystack, -$length) === $needle;
-    */
     return substr($haystack, -strlen($needle)) === $needle;
 }
+*/
 
 function parseCommand(array $update, string $prefixes = '!/', int $maxParams = 3): array
 {

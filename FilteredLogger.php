@@ -13,13 +13,13 @@ class FilteredLogger
 
     public function __construct(array &$robotConfig, $index)
     {
-        Magic::classExists();
+        //Magic::classExists();
         \error_clear_last();
 
         $logger = $robotConfig['mp'][$index]['settings']['logger'] ?? [];
 
         $dest  = $logger['logger']       ?? Logger::FILE_LOGGER;
-        $name  = $logger['logger_param'] ?? "MadelineProto.log";
+        $name  = $logger['logger_param'] ?? __DIR__ . "/MadelineProto.log";
         $level = $logger['logger_level'] ?? Logger::NOTICE;
         $size  = $logger['max_size']     ?? 100 * 1024 * 1024;
 
@@ -81,6 +81,10 @@ class FilteredLogger
             if (strEndsWith($entry, 'Enabled PHP logging')) {
                 $this->filteredLog->logger("Deleted: $entry", $level, $file);
                 return;
+            } elseif (strpos($entry, 'Shutting down MadelineProto (API)') !== false) {
+                $level = 1;
+            } elseif (strpos($entry, 'Shutting down MadelineProto (MTProto)') !== false) {
+                $level = 1;
             } elseif (strpos($entry, 'Auth key not registered, resetting temporary and permanent auth keys...') !== false) {
                 $level = 0;
             } elseif (strpos($entry, 'Could not resend req_') !== false) {

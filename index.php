@@ -5,6 +5,7 @@ declare(strict_types=1);
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
 use danog\MadelineProto\API;
+use danog\MadelineProto\Tools;
 use danog\MadelineProto\Magic;
 use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize};
@@ -21,6 +22,7 @@ require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
+error_log(toJSON($robotConfig));
 
 define("MEMORY_LIMIT",   \ini_get('memory_limit'));
 define('REQUEST_URL',    \getRequestURL() ?? '');
@@ -53,6 +55,7 @@ if ($signalHandler && \defined('SIGINT')) {
     }
 }
 
+Magic::classExists();
 if ($robotConfig['mp'][0]['filterlog'] ?? false) {
     $filteredLogger = new FilteredLogger($robotConfig, 0);
 } else {
@@ -73,6 +76,14 @@ if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
 Logger::log('', Logger::ERROR);
 Logger::log('=====================================================', Logger::ERROR);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
+
+if (!acquireBaseLock(getSessionName($robotConfig))) {
+    closeConnection("Process already running!");
+    exit();
+}
+
+exit();
+
 $launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
 $launch = \Launch::floatToDate($launch, $userDate);
 Logger::log("Appended Run Record: " . toJSON($launch, false), Logger::ERROR);
@@ -108,16 +119,15 @@ if (false && \defined('SIGINT')) {
 if ($signalHandler) {
     Shutdown::addCallback(
         static function (): void {
-            echo ('Oh no!' . PHP_EOL);
+            echo ('Oh, no!' . PHP_EOL);
+            Logger::log('Oh, no!');
         },
         'duration'
     );
 }
 
-$session  = $robotConfig['mp'][0]['session'];
+$session  = getSessionName($robotConfig);
 $settings = $robotConfig['mp'][0]['settings'];
-\set_error_handler(['\\danog\\MadelineProto\\Exception', 'exceptionErrorHandler']);
-\set_exception_handler(['\\danog\\MadelineProto\\Exception', 'exceptionHandler']);
 $mp = new API($session, $settings);
 \error_clear_last();
 
@@ -215,4 +225,70 @@ function exceptionHandler($exception)
 {
     Logger::log($exception, Logger::FATAL_ERROR);
     Magic::shutdown(1);
+}
+
+function closeConnection(string $message = 'OK!'): void
+{
+    if (PHP_SAPI === 'cli' || \headers_sent()) {
+        return;
+    }
+    Logger::log($message, Logger::FATAL_ERROR);
+    $buffer = @\ob_get_clean() ?: '';
+    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
+    \ignore_user_abort(true);
+    \header('Connection: close');
+    \header('Content-Type: text/html');
+    echo $buffer;
+    \flush();
+    if (\function_exists('fastcgi_finish_request')) {
+        \fastcgi_finish_request();
+    }
+}
+
+function getSessionName(array $robotConfig): string
+{
+    return $robotConfig['mp'][0]['session'] ?? 'madeline.madeline';
+}
+
+
+function acquireBaseLock(string $sessionName): bool
+{
+    $acquired = true;
+    if (PHP_SAPI !== 'cli') {
+        if (isset($_REQUEST['MadelineSelfRestart'])) {
+            Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
+        }
+        $lockfile  = $sessionName . '.base.lock';
+        $try_locking = true;
+        if (!\file_exists($lockfile)) {
+            \touch($lockfile);
+            $lock = \fopen($lockfile, 'r+');
+        } elseif (isset($GLOBALS['lock'])) {
+            $try_locking = false;
+            $lock = $GLOBALS['lock'];
+        } else {
+            $lock = \fopen($lockfile, 'r+');
+        }
+        if ($try_locking) {
+            Logger::log('Will try locking');
+            $try = 1;
+            $locked = false;
+            while (!$locked) {
+                $locked = \flock($lock, LOCK_EX | LOCK_NB);
+                if (!$locked) {
+                    \closeConnection('Bot is already running');
+                    if ($try++ >= 30) {
+                        // Log the event.
+                        $acquired = false;
+                        return $acquired;
+                        exit;
+                    }
+                    \sleep(1);
+                }
+            }
+            Logger::log('Locked!', Logger::ERROR);
+        }
+        Logger::log('Bot was continued', Logger::ERROR);
+        return $acquired;
+    }
 }

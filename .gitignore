@@ -2,12 +2,13 @@ composer.phar
 composer.lock
 /vendor/
 
-MadelineProto.log
-madeline.madeline
-madeline.madeline.lock
 madeline.phar
 madeline.phar.version
 madeline.php
+
+MadelineProto.log
+madeline.madeline
+madeline.madeline.lock
 
 madeline.madeline.ipc
 madeline.madeline.safe.php.temp.php
