@@ -37,7 +37,7 @@ if (!function_exists('str_ends_with')) {
 if (!function_exists('str_begins_with')) {
     function str_begins_with(string $haystack, string $needle): bool
     {
-        return substr($haystack, strlen($needle)) === $needle;
+        return substr($haystack, 0, strlen($needle)) === $needle;
     }
 }
 
@@ -109,17 +109,21 @@ function logit(string $entry, object $api = null, int $level = \danog\madelinepr
     }
 }
 
-function includeMadeline(string $source = 'phar', string $param = '')
+function includeMadeline(string $source = 'phar', string $param = null)
 {
     switch ($source) {
         case 'phar':
             if (!\file_exists('madeline.php')) {
                 \copy('https://phar.madelineproto.xyz/madeline.php', 'madeline.php');
             }
+            if ($param) {
+                define('MADELINE_BRANCH', $param);
+            }
             include 'madeline.php';
             break;
         case 'composer':
-            include 'vendor/autoload.php';
+            $prefix = !$param ? '' : ($param . '/');
+            include $prefix . 'vendor/autoload.php';
             break;
         default:
             throw new \ErrorException("Invalid argument: '$source'");
@@ -455,6 +459,9 @@ function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = nu
 
 function authorizationState(object $api): int
 {
+    if (isset($api) && !isset($api->API)) {
+        return -2;
+    }
     return $api ? ($api->API ? $api->API->authorized : 4) : 5;
 }
 function authorizationStateDesc(int $authorized): string
@@ -474,10 +481,13 @@ function authorizationStateDesc(int $authorized): string
             return 'INVALID_APP';
         case 5:
             return 'NULL_API_OBJECT';
+        case -2:
+            return 'UNINSTANTIATED_MTPROTO';
         default:
             throw new \ErrorException("Invalid authorization status: $authorized");
     }
 }
+
 
 function problematicAccount(object $api): bool
 {

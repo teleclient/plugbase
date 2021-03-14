@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use danog\madelineproto\Logger;
+use function Amp\File\{get, put, exists, getSize};
 
 require_once 'Plugin.php';
 require_once 'AbstractPlugin.php';
@@ -61,9 +62,9 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->canExecute = false;
         $this->stopReason = "UNKNOWN";
 
+        //Logger::log(toJSON($this->robotConfig));
         $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
         $record = \Launch::floatToDate($record, $this->userDate);
-        Logger::log(toJSON($this->robotConfig));
         Logger::log("EventHandler Update Run Record: " . toJSON($record, false), Logger::ERROR);
 
         $start = $this->formatTime(microtime(true));
@@ -86,15 +87,12 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $isNew = floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
         if (!$this->canExecute && $verb !== '' && $this->newMessage($update)) {
             $this->newMessage($update);
-
-
             $this->canExecute = true;
             $this->logger('Command-Processing engine started at ' . $this->formatTime(), Logger::ERROR);
         }
         $vars = ['verb' => $verb];
         if ($verb !== '') {
-            $msgDate   = floatval($update['message']['date']) + 0.1000000;
-            $msgDate   = $this->formatTime($msgDate);
+            $msgDate   = $this->formatTime(floatval($update['message']['date']));
             $nowDate   = $this->formatTime(\microtime(true));
             $startDate = $this->formatTime($this->getScriptStarted());
             $age = $this->canExecute() ? 'new' : 'old';
@@ -190,11 +188,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->prefixes;
     }
 
-    //function getSessionCreated(): float
-    //{
-    //    return $this->sessionCreated ?? 0;
-    //}
-
     function getScriptStarted(): float
     {
         return SCRIPT_START_TIME; // $this->scriptStarted;
@@ -217,6 +210,20 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     function newMessage(array $update): bool
     {
         return floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
+    }
+
+    public function getSessionCreation(): \Generator // float
+    {
+        $filepath = CREATION_FILE;
+        $strTime  = yield \Amp\File\get($filepath);
+        if ($strTime === null || $strTime === '') {
+            $microTime = $this->getScriptStarted();
+            $strTime   = strval(intval(round($microTime * 1000000)));
+            yield \Amp\File\put($filepath, $strTime);
+        } else {
+            $microTime = round(intval($strTime) / 1000000);
+        }
+        return $microTime;
     }
 
     private function possiblyVerb(array $update, string $prefixes = '!/', int $maxlen = 20): string

@@ -42,7 +42,7 @@ class Launch
         //$lines  = yield Amp\File\get($fileName);
         $content = '';
         foreach ($lines as $line) {
-            if (strStartsWith($line, $key . ' ')) {
+            if (str_begins_with($line, $key . ' ')) {
                 $items = explode(' ', $line);
                 $record['time_start']    = intval($items[0]);
                 $record['time_end']      = intval($items[1]);
@@ -79,7 +79,7 @@ class Launch
         //$lines  = yield Amp\File\get($fileName);
         $content = '';
         foreach ($lines as $line) {
-            if (strStartsWith($line, $key . ' ')) {
+            if (str_begins_with($line, $key . ' ')) {
                 $items = explode(' ', $line);
                 $record['time_start']    = intval($items[0]);
                 $record['time_end']      = self::floatToIntStr($scriptEndTime);
@@ -95,7 +95,7 @@ class Launch
             }
         }
         if ($new === null) {
-            throw new \ErrorException("Launch record not found! key: $scriptStartTime");
+            throw new \ErrorException("Launch record not found! key: $key, last: '$content'");
         }
         file_put_contents($fileName, rtrim($content));
         //yield Amp\File\put($fileName, rtrim($content));
@@ -118,7 +118,7 @@ class Launch
         yield $eh->logger("Launches Count:" . count($lines), Logger::ERROR);
         $record = null;
         foreach ($lines as $line) {
-            if (strStartsWith($line, $key . ' ')) {
+            if (str_begins_with($line, $key . ' ')) {
                 break;
             }
             $record = $line;
@@ -166,7 +166,6 @@ class Launch
 
     private static function floatFromIntStr(string $strMicrotime): float
     {
-        //return strval(intval(round($microtime * 1000 * 1000)));
         return round(intval($strMicrotime) / 1000000);
     }
 }

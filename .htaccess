@@ -20,7 +20,7 @@ php_value max_execution_time 0
 # Uncomment the following three lines for Hostinger
 SecFilterEngine   Off
 SecFilterScanPOST Off
-#Header always set Content-Security-Policy: upgrade-insecure-requests
+Header always set Content-Security-Policy: upgrade-insecure-requests
 
 RewriteEngine on
 RewriteRule .* - [E=noconntimeout:1]

@@ -27,3 +27,5 @@ config.php
 
 .idea/
 nbproject/
+trace.txt
+nbproject/

@@ -2,6 +2,7 @@
     "name": "teleclient/plugablebase",
     "description": "Project description",
     "type": "project",
+    "license": "AGPL-3.0-only",
     "require": {
         "danog/madelineproto": "^5.1"
     },

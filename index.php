@@ -8,10 +8,11 @@ use danog\MadelineProto\API;
 use danog\MadelineProto\Tools;
 use danog\MadelineProto\Magic;
 use Amp\Loop;
-use function Amp\File\{get, put, exists, getSize};
+use function Amp\File\{get, put, exists, getSize, touch};
 
 define("SCRIPT_START_TIME", \microtime(true));
 define('SCRIPT_INFO',       'BASE_PLG V1.0.0'); // <== Do not change!
+$clean = false;
 
 require_once 'functions.php';
 initPhp();
@@ -23,12 +24,16 @@ require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
 
-define("MEMORY_LIMIT",   \ini_get('memory_limit'));
-define('REQUEST_URL',    \getRequestURL() ?? '');
-define('USER_AGENT',     \getUserAgent() ?? '');
-define("DATA_DIRECTORY", \makeDataDirectory('data'));
-define("STARTUPS_FILE",  \makeDataFile(DATA_DIRECTORY, 'startups.txt'));
-define("LAUNCHES_FILE",  \makeDataFile(DATA_DIRECTORY, 'launches.txt'));
+define("MEMORY_LIMIT", \ini_get('memory_limit'));
+define('REQUEST_URL',  \getRequestURL() ?? '');
+define('USER_AGENT',   \getUserAgent()  ?? '');
+
+$dataFiles = makeDataFiles(dirname(__FILE__) . '/data', ['startups', 'launches', 'creation', 'prevented']);
+define("STARTUPS_FILE",  $dataFiles['startups']);
+define("LAUNCHES_FILE",  $dataFiles['launches']);
+define("CREATION_FILE",  $dataFiles['creation']);
+define("PREVENTED_FILE", $dataFiles['prevented']);
+unset($dataFiles);
 
 $signalHandler = true;
 $signal        = null;
@@ -69,18 +74,26 @@ if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
     $text = 'More than ' . $robotConfig['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
     Logger::log($text, Logger::ERROR);
     Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-    exit($text . PHP_EOL);
+    echo ($text . PHP_EOL);
+    exit(1);
+}
+
+$processId = \getmypid() === false ? 0 : \getmypid();
+$sessionLock = null;
+Logger::log("A new Process with pid $processId started at " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
+if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock)) {
+    closeConnection("Process already running!");
+    savePreventedProcess(SCRIPT_START_TIME);
+    removeShutdownHandlers();
+    $strTime = $userDate->format(SCRIPT_START_TIME);
+    Logger::log("Another instance of the script terminated at: " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
+    exit(1);
 }
 
 Logger::log('', Logger::ERROR);
 Logger::log('=====================================================', Logger::ERROR);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 Logger::log("Configurations: " . toJSON($robotConfig), Logger::ERROR);
-
-if (!acquireBaseLock(getSessionName($robotConfig))) {
-    closeConnection("Process already running!");
-    exit();
-}
 
 $launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
 $launch = \Launch::floatToDate($launch, $userDate);
@@ -127,14 +140,24 @@ if ($signalHandler) {
 $session  = getSessionName($robotConfig);
 $settings = $robotConfig['mp'][0]['settings'];
 $mp = new API($session, $settings);
+$newSession = newSession($mp);
+Logger::log($newSession ? 'Creating a new session-file.' : 'Un-serializing an existing sesson-file.');
+// To Be Fixed: n$ewSession is always true.
+if ($newSession) {
+    saveSessionCreation(CREATION_FILE, SCRIPT_START_TIME);
+}
+session_write_close();
 \error_clear_last();
 
 if ($signalHandler) {
     Shutdown::addCallback(
-        function () use ($mp, &$signal, $userDate) {
+        function () use ($mp, &$signal, $userDate, &$clean) {
             $scriptEndTime = \microTime(true);
             //$e = new \Exception;
             //Logger::log($e->getTraceAsString(), Logger::ERROR);
+            if ($clean) {
+                // Clean Exit
+            }
             $stopReason = 'nullapi';
             //var_dump(Tools::getVar($mp->API, 'destructing').PHP_EOL); => bool(false)
             if ($signal !== null) {
@@ -179,7 +202,6 @@ if ($signalHandler) {
         'duration'
     );
 }
-/*
 $authState = authorizationState($mp);
 Logger::log("Authorization State: " . authorizationStateDesc($authState));
 if ($authState === 4) {
@@ -187,18 +209,13 @@ if ($authState === 4) {
     Logger::log(PHP_EOL . "Invalid App, or the Session is corrupted!", Logger::ERROR);
 }
 Logger::log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'), Logger::ERROR);
-*/
-//safeStartAndLoop($mp, BaseEventHandler::class);
 
-
-simpleStartAndLoop($mp, BaseEventHandler::class);
-//$mp->startAndLoop(BaseEventHandler::class);
+safeStartAndLoop($mp, BaseEventHandler::class);
 \error_clear_last();
 echo ('Bye, bye!<br>' . PHP_EOL);
 Logger::log('Bye, bye!', Logger::ERROR);
-
-//\set_error_handler(['\\danog\\MadelineProto\\Exception', 'exceptionErrorHandler']);
-//\set_exception_handler(['\\danog\\MadelineProto\\Exception', 'exceptionHandler']);
+$clean = true;
+exit(0);
 
 function exceptionErrorHandler($errno = 0, $errstr = null, $errfile = null, $errline = null)
 {
@@ -248,45 +265,121 @@ function getSessionName(array $robotConfig): string
     return $robotConfig['mp'][0]['session'] ?? 'madeline.madeline';
 }
 
+function newSession(API $mp): bool
+{
+    return !Tools::getVar($mp, 'oldInstance');
+}
 
-function acquireBaseLock(string $sessionName): bool
+
+function acquireScriptLock(string $sessionName, &$lock): bool
 {
     $acquired = true;
     if (PHP_SAPI !== 'cli') {
         if (isset($_REQUEST['MadelineSelfRestart'])) {
             Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
         }
-        $lockfile  = $sessionName . '.base.lock';
-        $try_locking = true;
+        $lockfile = $sessionName . '.script.lock';
         if (!\file_exists($lockfile)) {
             \touch($lockfile);
-            $lock = \fopen($lockfile, 'r+');
-        } elseif (isset($GLOBALS['lock'])) {
-            $try_locking = false;
-            $lock = $GLOBALS['lock'];
-        } else {
-            $lock = \fopen($lockfile, 'r+');
+            //Logger::log("Lock file '$lockfile' created!", Logger::ERROR);
         }
-        if ($try_locking) {
-            Logger::log('Will try locking');
-            $try = 1;
-            $locked = false;
-            while (!$locked) {
-                $locked = \flock($lock, LOCK_EX | LOCK_NB);
-                if (!$locked) {
-                    //\closeConnection('Bot is already running');
-                    if ($try++ >= 30) {
-                        // Log the event.
-                        $acquired = false;
-                        return $acquired;
-                    }
-                    \sleep(1);
+        $lock = \fopen($lockfile, 'r+');
+        //Logger::log("Lock file '$lockfile' opened!", Logger::ERROR);
+        $try = 1;
+        $locked = false;
+        while (!$locked) {
+            $locked = \flock($lock, LOCK_EX | LOCK_NB);
+            if (!$locked) {
+                //Logger::log("Try $try of locking file '$lockfile' failed!", Logger::ERROR);
+                if ($try++ >= 20) {
+                    Logger::log("Locking file '$lockfile' failed!", Logger::ERROR); // Bot is running!
+                    $acquired = false;
+                    return $acquired;
                 }
+                \sleep(1);
             }
-            Logger::log('Locked!', Logger::ERROR);
         }
-        Logger::log('Bot was continued', Logger::ERROR);
+        Logger::log("File '$lockfile' successfully locked!", Logger::ERROR); // Bot is not running!
         return $acquired;
     }
     return $acquired;
+}
+
+function saveSessionCreation(string $file, float $creationTime): void
+{
+    $strval = strval(intval(round($creationTime * 1000000)));
+    file_put_contents($file, $strval);
+}
+
+function fetchSessionCreation(string $folder, string $file): float
+{
+    $strval = file_get_contents($folder . '/', $file);
+    return round(intval($strval) / 1000000);
+}
+
+function get_absolute_path($path)
+{
+    $path = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $path);
+    $parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), 'strlen');
+    $absolutes = array();
+    foreach ($parts as $part) {
+        if ('.' == $part) continue;
+        if ('..' == $part) {
+            array_pop($absolutes);
+        } else {
+            $absolutes[] = $part;
+        }
+    }
+    return implode(DIRECTORY_SEPARATOR, $absolutes);
+}
+
+function removeShutdownHandlers(): void
+{
+    $class = new ReflectionClass('danog\MadelineProto\Shutdown');
+    $callbacks = $class->getStaticPropertyValue('callbacks');
+
+    Logger::log("Shutdown Callbacks Count: " . count($callbacks), Logger::ERROR);
+    //Shutdown::removeCallback(null);
+
+    register_shutdown_function(function () {
+    });
+}
+
+function savePreventedProcess(float $startTime): void
+{
+    $data = strval(intval(round($startTime * 1000 * 1000)));
+    file_put_contents(PREVENTED_FILE, $data, FILE_APPEND);
+}
+
+function absolutePath(string $path): string
+{
+    $path = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $path);
+    $parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), 'strlen');
+    $absolutes = array();
+    foreach ($parts as $part) {
+        if ('.' == $part) continue;
+        if ('..' == $part) {
+            array_pop($absolutes);
+        } else {
+            $absolutes[] = $part;
+        }
+    }
+    return implode(DIRECTORY_SEPARATOR, $absolutes);
+}
+
+function makeDataFiles(string $dirPath, array $baseNames): array
+{
+    // To Be Implemented as Async using Amp Iterator.
+    if (!file_exists($dirPath)) {
+        \mkdir($dirPath);
+    }
+    $absPaths['directory'] = $dirPath;
+    foreach ($baseNames as $baseName) {
+        $absPath = $dirPath . '/' . $baseName . '.txt';
+        if (!file_exists($absPath)) {
+            \touch($absPath);
+        }
+        $absPaths[$baseName] = $absPath;
+    }
+    return $absPaths;
 }

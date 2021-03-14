@@ -125,6 +125,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 yield $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'status':
+                $sessionCreation = yield $eh->getSessionCreation();
                 $peakMemUsage    = formatBytes(\getPeakMemory(), 3);
                 $currentMemUsage = formatBytes(\getCurrentMemory(), 3);
                 $memoryLimit     = ini_get('memory_limit');
@@ -156,10 +157,10 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: $robotId<br>";
-                //$status .= "Session Age: "            . \UserDate::duration($eh->getSessionCreated(),      $now) . "<br>";
-                $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),       $now) . "<br>";
-                $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),  $now) . "<br>";
-                //$status .= "Handler Unserialized Age: " . \UserDate::duration($eh->getHandlerUnserialized(), $now) . "<br>";
+                //$status .= "Session Age: "            . \UserDate::duration($sessionCreation,               $now) . "<br>";
+                $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),        $now) . "<br>";
+                $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),   $now) . "<br>";
+                //$status .= "Handler Unserialized Age: " . \UserDate::duration($eh->getHandlerUnserialized(),$now) . "<br>";
                 $status .= "Peak Memory: $peakMemUsage<br>";
                 $status .= "Current Memory: $currentMemUsage<br>";
                 $status .= "Allowed Memory: $memoryLimit<br>";
