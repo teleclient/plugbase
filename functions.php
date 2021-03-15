@@ -626,6 +626,9 @@ Interface, LaunchMethod
 4) CLI, Manual
 5) CLI, Cron
 */
+//if (isset($_REQUEST['MadelineSelfRestart'])) {
+//    Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
+//}
 function getLaunchMethod(): string
 {
     if (PHP_SAPI === 'cli') {
@@ -644,7 +647,9 @@ function getLaunchMethod(): string
     } else {
         $interface    = 'web';
         $launchMethod = 'UNKNOWN';
-        if (isset($_SERVER['REQUEST_URI'])) {
+        if (isset($_REQUEST['MadelineSelfRestart'])) {
+            $launchMethod = 'restart';
+        } elseif (isset($_SERVER['REQUEST_URI'])) {
             $requestUri = htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8');
             if (stripos($requestUri, '?MadelineSelfRestart=') !== false) {
                 $launchMethod = 'restart';
@@ -787,6 +792,7 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
                 }
                 */
                 $me = yield $mp->start();
+                \closeConnection('Bot was Started!');
                 /*
                 yield $mp->logger("Authorization State: {Before Start:'$stateBefore'}", Logger::ERROR);
                 $stateAfter = authorizationState($mp);

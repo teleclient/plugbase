@@ -121,7 +121,9 @@ class Launch
             if (str_begins_with($line, $key . ' ')) {
                 break;
             }
-            $record = $line;
+            if (!str_contains($line, ' blocked ')) {
+                $record = $line;
+            }
         }
         if ($record === null) {
             return null;
@@ -140,6 +142,26 @@ class Launch
         return $launch;
     }
 
+    public static function appendBlockedRecord(string $fileName, float $scriptStartTime, string $stopReason = 'blocked'): array
+    {
+        $key = self::floatToIntStr($scriptStartTime);
+
+        $record['time_start']    = $key;
+        $record['time_end']      = $key;
+        $record['launch_method'] = \getLaunchMethod();
+        $record['stop_reason']   = 'blocked';
+        $record['memory_start']  = \getPeakMemory();
+        $record['memory_middle'] = 0;
+        $record['memory_end']    = 0;
+
+        $line = self::makeLine($record);
+
+        file_put_contents($fileName, "\n" . $line, FILE_APPEND | LOCK_EX);
+
+        $record['time_start'] = $scriptStartTime;
+        return $record;
+    }
+
     public static function floatToDate(array $record, UserDate $userDate): array
     {
         $record['time_start'] = $userDate->format($record['time_start']);
@@ -153,6 +175,7 @@ class Launch
         //$record['time_end'] = $record['time_end'] === 0 ? 'UNAVAILABLE' : ($userDate->format($record['time_end']));
         return $record;
     }
+
 
     private static function makeLine(array $record): string
     {

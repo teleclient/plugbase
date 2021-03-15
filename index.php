@@ -17,6 +17,8 @@ $clean = false;
 require_once 'functions.php';
 initPhp();
 includeMadeline('composer');
+include 'closeconnection.php';
+
 require_once 'UserDate.php';
 require_once 'FilteredLogger.php';
 require_once 'Launch.php';
@@ -28,12 +30,13 @@ define("MEMORY_LIMIT", \ini_get('memory_limit'));
 define('REQUEST_URL',  \getRequestURL() ?? '');
 define('USER_AGENT',   \getUserAgent()  ?? '');
 
-$dataFiles = makeDataFiles(dirname(__FILE__) . '/data', ['startups', 'launches', 'creation', 'prevented']);
+$dataFiles = makeDataFiles(dirname(__FILE__) . '/data', ['startups', 'launches', 'creation']);
 define("STARTUPS_FILE",  $dataFiles['startups']);
 define("LAUNCHES_FILE",  $dataFiles['launches']);
 define("CREATION_FILE",  $dataFiles['creation']);
-define("PREVENTED_FILE", $dataFiles['prevented']);
 unset($dataFiles);
+
+$userDate = new \UserDate($robotConfig['zone']);
 
 $signalHandler = true;
 $signal        = null;
@@ -67,8 +70,6 @@ if ($robotConfig['mp'][0]['filterlog'] ?? false) {
     \error_clear_last();
 }
 
-$userDate = new \UserDate($robotConfig['zone']);
-
 $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
 if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
     $text = 'More than ' . $robotConfig['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
@@ -78,14 +79,17 @@ if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
     exit(1);
 }
 
+if (isset($_REQUEST['MadelineSelfRestart'])) {
+    Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
+}
+
 $processId = \getmypid() === false ? 0 : \getmypid();
 $sessionLock = null;
 Logger::log("A new Process with pid $processId started at " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock)) {
-    closeConnection("Process already running!");
-    savePreventedProcess(SCRIPT_START_TIME);
+    closeConnection("Bot is already running!");
     removeShutdownHandlers();
-    $strTime = $userDate->format(SCRIPT_START_TIME);
+    $launch = \Launch::appendBlockedRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'blocked');
     Logger::log("Another instance of the script terminated at: " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
     exit(1);
 }
@@ -102,8 +106,10 @@ unset($launch);
 
 if (PHP_SAPI !== 'cli') {
     if (!\getWebServerName()) {
-        \setWebServerName($robotConfig['config->host']);
-        if (!\getWebServerName()) {
+        $hostname = $robotConfig['host'] ?? null;
+        if ($hostname) {
+            \setWebServerName($hostname);
+        } else {
             $text = "To enable the restart, the config->host must be defined!";
             echo ($text . PHP_EOL);
             Logger::log($text, Logger::ERROR);
@@ -137,16 +143,14 @@ if ($signalHandler) {
     );
 }
 
-$session  = getSessionName($robotConfig);
-$settings = $robotConfig['mp'][0]['settings'];
+$session    = getSessionName($robotConfig);
+$settings   = $robotConfig['mp'][0]['settings'];
+$newSession = file_exists($session) ? false : true;
 $mp = new API($session, $settings);
-$newSession = newSession($mp);
 Logger::log($newSession ? 'Creating a new session-file.' : 'Un-serializing an existing sesson-file.');
-// To Be Fixed: n$ewSession is always true.
 if ($newSession) {
     saveSessionCreation(CREATION_FILE, SCRIPT_START_TIME);
 }
-session_write_close();
 \error_clear_last();
 
 if ($signalHandler) {
@@ -242,42 +246,15 @@ function exceptionHandler($exception)
     Magic::shutdown(1);
 }
 
-function closeConnection(string $message = 'OK!'): void
-{
-    if (PHP_SAPI === 'cli' || \headers_sent()) {
-        return;
-    }
-    Logger::log($message, Logger::FATAL_ERROR);
-    $buffer = @\ob_get_clean() ?: '';
-    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
-    \ignore_user_abort(true);
-    \header('Connection: close');
-    \header('Content-Type: text/html');
-    echo $buffer;
-    \flush();
-    if (\function_exists('fastcgi_finish_request')) {
-        \fastcgi_finish_request();
-    }
-}
-
 function getSessionName(array $robotConfig): string
 {
     return $robotConfig['mp'][0]['session'] ?? 'madeline.madeline';
 }
 
-function newSession(API $mp): bool
-{
-    return !Tools::getVar($mp, 'oldInstance');
-}
-
-
 function acquireScriptLock(string $sessionName, &$lock): bool
 {
     $acquired = true;
     if (PHP_SAPI !== 'cli') {
-        if (isset($_REQUEST['MadelineSelfRestart'])) {
-            Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
-        }
         $lockfile = $sessionName . '.script.lock';
         if (!\file_exists($lockfile)) {
             \touch($lockfile);
@@ -345,28 +322,6 @@ function removeShutdownHandlers(): void
     });
 }
 
-function savePreventedProcess(float $startTime): void
-{
-    $data = strval(intval(round($startTime * 1000 * 1000)));
-    file_put_contents(PREVENTED_FILE, $data, FILE_APPEND);
-}
-
-function absolutePath(string $path): string
-{
-    $path = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $path);
-    $parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), 'strlen');
-    $absolutes = array();
-    foreach ($parts as $part) {
-        if ('.' == $part) continue;
-        if ('..' == $part) {
-            array_pop($absolutes);
-        } else {
-            $absolutes[] = $part;
-        }
-    }
-    return implode(DIRECTORY_SEPARATOR, $absolutes);
-}
-
 function makeDataFiles(string $dirPath, array $baseNames): array
 {
     // To Be Implemented as Async using Amp Iterator.
@@ -382,4 +337,90 @@ function makeDataFiles(string $dirPath, array $baseNames): array
         $absPaths[$baseName] = $absPath;
     }
     return $absPaths;
+}
+
+/*
+function closeConnection(string $message = 'OK!'): void
+{
+    if (PHP_SAPI === 'cli' || \headers_sent()) {
+        return;
+    }
+    Logger::log($message, Logger::FATAL_ERROR);
+    $buffer = @\ob_get_clean() ?: '';
+    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
+    \ignore_user_abort(true);
+    \header('Connection: close');
+    \header('Content-Type: text/html');
+    echo $buffer;
+    \flush();
+    if (\function_exists('fastcgi_finish_request')) {
+        \fastcgi_finish_request();
+    }
+}
+*/
+
+/**
+ * Close the connection to the browser but continue processing the operation
+ * @param $body
+ */
+function closeConnection(string $message = 'OK', int $responseCode = 200): void
+{
+    if (PHP_SAPI === 'cli' || \headers_sent()) {
+        return;
+    }
+    Logger::log($message, Logger::FATAL_ERROR);
+
+    $buffer  = @\ob_get_clean() ?: '';
+    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
+
+    // Cause we are clever and don't want the rest of the script to be bound by a timeout.
+    // Set to zero so no time limit is imposed from here on out.
+    set_time_limit(0);
+
+    // if using (u)sleep in an XHR the next requests are still hanging until sleep finishes
+    session_write_close();
+
+    // Client disconnect should NOT abort our script execution
+    ignore_user_abort(true);
+
+    // Clean (erase) the output buffer and turn off output buffering
+    // in case there was anything up in there to begin with.
+    if (ob_get_length() > 0) {
+        ob_end_clean();
+    }
+
+    // Turn on output buffering, because ... we just turned it off ...
+    // if it was on.
+    ob_start();
+
+    echo $buffer;
+
+    // Return the length of the output buffer
+    $size = ob_get_length();
+
+    // send headers to tell the browser to close the connection
+    // remember, the headers must be called prior to any actual
+    // input being sent via our flush(es) below.
+    header("Connection: close\r\n");
+    header("Content-Encoding: none\r\n");
+    header("Content-Length: $size");
+
+    // Set the HTTP response code
+    // this is only available in PHP 5.4.0 or greater
+    http_response_code($responseCode);
+
+    // Flush (send) the output buffer and turn off output buffering
+    ob_end_flush();
+
+    // Flush (send) the output buffer
+    // This looks like overkill, but trust me. I know, you really don't need this
+    // unless you do need it, in which case, you will be glad you had it!
+    @ob_flush();
+
+    // Flush system output buffer
+    // I know, more over kill looking stuff, but this
+    // Flushes the system write buffers of PHP and whatever backend PHP is using
+    // (CGI, a web server, etc). This attempts to push current output all the way
+    // to the browser with a few caveats.
+    flush();
 }

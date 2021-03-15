@@ -87,6 +87,9 @@ class FilteredLogger
                 $level = 1;
             } elseif (strpos($entry, 'Auth key not registered, resetting temporary and permanent auth keys...') !== false) {
                 $level = 0;
+            } elseif (str_begins_with($entry, 'Already got response for ') && str_contains($entry, ' with message ID ')) {
+                //$API->logger->logger('Already got response for ' . $connection->outgoing_messages[$message_id]['_'] . ' with message ID ' . $message_id);
+                $entry = $entry;
             } elseif (strpos($entry, 'Could not resend req_') !== false) {
                 $this->filteredLog->logger($entry, 0, $file);
                 $this->filteredLog->logger("Session was terminated!", 0, $file);

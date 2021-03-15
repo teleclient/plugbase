@@ -157,7 +157,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: $robotId<br>";
-                //$status .= "Session Age: "            . \UserDate::duration($sessionCreation,               $now) . "<br>";
+                $status .= "Session Age: "              . \UserDate::duration($sessionCreation,               $now) . "<br>";
                 $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),        $now) . "<br>";
                 $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),   $now) . "<br>";
                 //$status .= "Handler Unserialized Age: " . \UserDate::duration($eh->getHandlerUnserialized(),$now) . "<br>";
