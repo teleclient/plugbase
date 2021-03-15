@@ -190,7 +190,6 @@ if ($signalHandler) {
                 }
             }
 
-            echo (PHP_EOL . "Shutting down due to '$stopReason' ....<br>" . PHP_EOL);
             Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
             $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
             $record = \Launch::floatToDate($record, $userDate);
