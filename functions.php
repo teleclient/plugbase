@@ -524,7 +524,7 @@ function getCpuUsage(): string
 {
     if (function_exists('sys_getloadavg')) {
         $load = sys_getloadavg();
-        $strval = number_format($load[0], 2, '.', '') . '%';
+        $strval = number_format($load[0], 2, '.', '');
         return $strval;
     } else {
         return 'UNAVAILABLE';

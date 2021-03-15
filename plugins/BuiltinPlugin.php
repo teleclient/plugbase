@@ -164,7 +164,7 @@ class BuiltinPlugin extends AbstractPlugin implements Plugin
                 $status .= "Peak Memory: $peakMemUsage<br>";
                 $status .= "Current Memory: $currentMemUsage<br>";
                 $status .= "Allowed Memory: $memoryLimit<br>";
-                $status .= 'CPU: '         . getCpuUsage() . '<br>';
+                $status .= 'CPU Process Que Size: ' . getCpuUsage() . '<br>';
                 $status .= "Session Size: $sessionSize<br>";
                 $status .= 'Time: ' . $eh->getZone() . ' ' . $eh->formatTime() . '<br>';
                 $status .= 'Updates Processed: ' . $this->totalUpdates . '<br>';
