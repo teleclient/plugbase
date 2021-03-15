@@ -41,29 +41,6 @@ if (!function_exists('str_begins_with')) {
     }
 }
 
-/*
-function strStartsWith(string $haystack, string $needle, bool $caseSensitive = true): bool
-{
-    $length = strlen($needle);
-    $startOfHaystack = substr($haystack, 0, $length);
-    if ($caseSensitive) {
-        if ($startOfHaystack === $needle) {
-            return true;
-        }
-    } else {
-        if (strcasecmp($startOfHaystack, $needle) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function strEndsWith(string $haystack, string $needle): bool
-{
-    return substr($haystack, -strlen($needle)) === $needle;
-}
-*/
-
 function parseCommand(array $update, string $prefixes = '!/', int $maxParams = 3): array
 {
     $command = ['prefix' => '', 'verb' => null, 'params' => []];
@@ -785,18 +762,15 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
         while (true) {
             try {
                 $started = false;
-                /*
                 $stateBefore = authorizationState($mp);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
                     yield $mp->logger("Not Logged-in!", Logger::ERROR);
                 }
-                */
+
                 $me = yield $mp->start();
-                \closeConnection('Bot was Started!');
-                /*
-                yield $mp->logger("Authorization State: {Before Start:'$stateBefore'}", Logger::ERROR);
+
                 $stateAfter = authorizationState($mp);
-                yield $mp->logger("Authorization State{Before Start:'$stateBefore', After Start:'$stateAfter'}", Logger::ERROR);
+                yield $mp->logger("Authorization State: {Before_Start: '$stateBefore', After_Start: '$stateAfter'}", Logger::ERROR);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
                     yield $mp->logger("Unsuccessful Login!", Logger::ERROR);
                     throw new ErrorException('Unsuccessful Login!');
@@ -806,9 +780,11 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
-                */
+                \closeConnection('Bot was started!');
+
                 yield $mp->setEventHandler($eventHandler);
-                //$eh = $mp->getEventHandler($eventHandler);
+                $eh = $mp->getEventHandler($eventHandler);
+
                 foreach ($genLoops as $genLoop) {
                     $genLoop->start(); // Do NOT use yield.
                 }

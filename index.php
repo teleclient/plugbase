@@ -16,8 +16,7 @@ $clean = false;
 
 require_once 'functions.php';
 initPhp();
-includeMadeline('composer');
-include 'closeconnection.php';
+includeMadeline('phar');
 
 require_once 'UserDate.php';
 require_once 'FilteredLogger.php';
@@ -25,6 +24,7 @@ require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
+$userDate = new \UserDate($robotConfig['zone']);
 
 define("MEMORY_LIMIT", \ini_get('memory_limit'));
 define('REQUEST_URL',  \getRequestURL() ?? '');
@@ -35,8 +35,6 @@ define("STARTUPS_FILE",  $dataFiles['startups']);
 define("LAUNCHES_FILE",  $dataFiles['launches']);
 define("CREATION_FILE",  $dataFiles['creation']);
 unset($dataFiles);
-
-$userDate = new \UserDate($robotConfig['zone']);
 
 $signalHandler = true;
 $signal        = null;
