@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
-use danog\MadelineProto\Magic;
 
 class FilteredLogger
 {
@@ -13,7 +12,6 @@ class FilteredLogger
 
     public function __construct(array &$robotConfig, $index)
     {
-        //Magic::classExists();
         \error_clear_last();
 
         $logger = $robotConfig['mp'][$index]['settings']['logger'] ?? [];
@@ -48,7 +46,6 @@ class FilteredLogger
 
     public function __invoke($entry, int $level): void
     {
-        //try {
         $file = \basename(\debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['file'], '.php');
 
         if (\is_array($entry)) {
@@ -109,9 +106,6 @@ class FilteredLogger
                 exit(0);
             }
         }
-        //} catch (Throwable $e) {
-        //throw new Exception($e->getMessage());
-        //}
         $entry = $this->levelDescr($level) . ": " . $entry;
         $this->filteredLog->logger($entry, $level, $file);
         return;
