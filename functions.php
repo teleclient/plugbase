@@ -711,7 +711,7 @@ function checkTooManyRestarts(string $startupFilename): int
     $startups = [];
     if (\file_exists($startupFilename)) {
         $startupsText = \file_get_contents($startupFilename);
-        $startups = explode('\n', $startupsText);
+        $startups = explode("\n", $startupsText);
     } else {
         // Create the file
     }
@@ -725,7 +725,7 @@ function checkTooManyRestarts(string $startupFilename): int
         }
     }
     $startups[] = strval($nowMilli);
-    $startupsText = implode('\n', $startups);
+    $startupsText = implode("\n", $startups);
     \file_put_contents($startupFilename, $startupsText);
     $restartsCount = count($startups);
     return $restartsCount;
