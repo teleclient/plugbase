@@ -134,8 +134,7 @@ if (false && \defined('SIGINT')) {
 if ($signalHandler) {
     Shutdown::addCallback(
         static function (): void {
-            echo ('Oh, no!' . PHP_EOL);
-            Logger::log('Oh, no!');
+            Logger::log('Duration dummy placeholder shutdown routine executed!', Logger::ERROR);
         },
         'duration'
     );
@@ -161,7 +160,6 @@ if ($signalHandler) {
                 // Clean Exit
             }
             $stopReason = 'nullapi';
-            //var_dump(Tools::getVar($mp->API, 'destructing').PHP_EOL); => bool(false)
             if ($signal !== null) {
                 $stopReason = $signal;
             } elseif (!$mp) {

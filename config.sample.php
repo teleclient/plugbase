@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'admins'     => [],
+    'admins'     => [], // Robot Id will be authomatically be included
     //'ownerid'  => 1234,
     //'officeid' => 1234,
     //'host'     => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
