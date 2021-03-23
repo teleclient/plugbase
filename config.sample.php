@@ -10,8 +10,10 @@ return [
     'zone'     => 'Asia/Tehran',
     'prefixes' => '!/',
     'edit'     => false,
+    'maxrestarts' => 10,
     'mp'   => [
         0 => [
+            'filterlog'    => false,
             'notification' => 'off',
             'phone'    => '+14328364939',
             'password' => '',

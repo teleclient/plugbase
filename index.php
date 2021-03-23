@@ -11,7 +11,7 @@ use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
 define("SCRIPT_START_TIME", \microtime(true));
-define('SCRIPT_INFO',       'BASE_PLG V1.0.0'); // <== Do not change!
+define('SCRIPT_INFO',       'BASE_PLG V1.0.1'); // <== Do not change!
 $clean = false;
 
 require_once 'functions.php';
@@ -24,7 +24,7 @@ require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
-$userDate = new \UserDate($robotConfig['zone']);
+$userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
 
 define("MEMORY_LIMIT", \ini_get('memory_limit'));
 define('REQUEST_URL',  \getRequestURL() ?? '');
@@ -69,8 +69,9 @@ if ($robotConfig['mp'][0]['filterlog'] ?? false) {
 }
 
 $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
-if ($restartsCount > ($robotConfig['maxrestarts'] ?? 10)) {
-    $text = 'More than ' . $robotConfig['maxrestarts'] . ' times restarted within a minute. Permanently shutting down ....';
+$maxrestarts   = $robotConfig['maxrestarts'] ?? 10;
+if ($restartsCount > $maxrestarts) {
+    $text = 'More than $maxrestarts times restarted within a minute. Permanently shutting down ....';
     Logger::log($text, Logger::ERROR);
     Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
     echo ($text . PHP_EOL);
@@ -92,10 +93,12 @@ if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock)) {
     exit(1);
 }
 
+$safeConfig = safeConfig($robotConfig);
 Logger::log('', Logger::ERROR);
 Logger::log('=====================================================', Logger::ERROR);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
 Logger::log("Configurations: " . toJSON($robotConfig), Logger::ERROR);
+unset($safeConfig);
 
 $launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
 $launch = \Launch::floatToDate($launch, $userDate);
@@ -141,7 +144,7 @@ if ($signalHandler) {
 }
 
 $session    = getSessionName($robotConfig);
-$settings   = $robotConfig['mp'][0]['settings'];
+$settings   = $robotConfig['mp'][0]['settings'] ?? [];
 $newSession = file_exists($session) ? false : true;
 $mp = new API($session, $settings);
 Logger::log($newSession ? 'Creating a new session-file.' : 'Un-serializing an existing sesson-file.');
@@ -241,37 +244,46 @@ function exceptionHandler($exception)
     Magic::shutdown(1);
 }
 
+function safeConfig(array $robotConfig): array
+{
+    $safeConfig = $robotConfig;
+    array_walk_recursive($safeConfig, function (&$value, $key) {
+        if ($key     === 'phone')    $value = '';
+        elseif ($key === 'password') $value = '';
+        elseif ($key === 'api_id')   $value = 0;
+        elseif ($key === 'api_hash') $value = '';
+    });
+    return $safeConfig;
+}
+
 function getSessionName(array $robotConfig): string
 {
     return $robotConfig['mp'][0]['session'] ?? 'madeline.madeline';
 }
 
-function acquireScriptLock(string $sessionName, &$lock): bool
+function acquireScriptLock(string $sessionName, &$lock, $retryCount = 10): bool
 {
     $acquired = true;
     if (PHP_SAPI !== 'cli') {
         $lockfile = $sessionName . '.script.lock';
         if (!\file_exists($lockfile)) {
             \touch($lockfile);
-            //Logger::log("Lock file '$lockfile' created!", Logger::ERROR);
         }
         $lock = \fopen($lockfile, 'r+');
-        //Logger::log("Lock file '$lockfile' opened!", Logger::ERROR);
         $try = 1;
         $locked = false;
         while (!$locked) {
             $locked = \flock($lock, LOCK_EX | LOCK_NB);
             if (!$locked) {
-                //Logger::log("Try $try of locking file '$lockfile' failed!", Logger::ERROR);
-                if ($try++ >= 20) {
-                    Logger::log("Locking file '$lockfile' failed!", Logger::ERROR); // Bot is running!
+                if ($try++ >= $retryCount) {
+                    //Logger::log("Locking file '$lockfile' failed!", Logger::ERROR); // Bot is running!
                     $acquired = false;
                     return $acquired;
                 }
                 \sleep(1);
             }
         }
-        Logger::log("File '$lockfile' successfully locked!", Logger::ERROR); // Bot is not running!
+        //Logger::log("File '$lockfile' successfully locked!", Logger::ERROR); // Bot is not running!
         return $acquired;
     }
     return $acquired;
@@ -309,9 +321,7 @@ function removeShutdownHandlers(): void
 {
     $class = new ReflectionClass('danog\MadelineProto\Shutdown');
     $callbacks = $class->getStaticPropertyValue('callbacks');
-
     Logger::log("Shutdown Callbacks Count: " . count($callbacks), Logger::ERROR);
-    //Shutdown::removeCallback(null);
 
     register_shutdown_function(function () {
     });
@@ -333,26 +343,6 @@ function makeDataFiles(string $dirPath, array $baseNames): array
     }
     return $absPaths;
 }
-
-/*
-function closeConnection(string $message = 'OK!'): void
-{
-    if (PHP_SAPI === 'cli' || \headers_sent()) {
-        return;
-    }
-    Logger::log($message, Logger::FATAL_ERROR);
-    $buffer = @\ob_get_clean() ?: '';
-    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
-    \ignore_user_abort(true);
-    \header('Connection: close');
-    \header('Content-Type: text/html');
-    echo $buffer;
-    \flush();
-    if (\function_exists('fastcgi_finish_request')) {
-        \fastcgi_finish_request();
-    }
-}
-*/
 
 /**
  * Close the connection to the browser but continue processing the operation

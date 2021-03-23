@@ -26,6 +26,7 @@ junk*
 data/
 config.php
 
+.vscode/
 .idea/
 nbproject/
 trace.txt
