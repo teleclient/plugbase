@@ -87,7 +87,7 @@ class FilteredLogger
             } elseif (str_begins_with($entry, 'Already got response for ') && str_contains($entry, ' with message ID ')) {
                 //$API->logger->logger('Already got response for ' . $connection->outgoing_messages[$message_id]['_'] . ' with message ID ' . $message_id);
                 $entry = $entry;
-            } elseif (strpos($entry, 'Could not resend req_') !== false) {
+            } elseif (strpos($entry, 'Could not resend ') !== false) {
                 $this->filteredLog->logger($entry, 0, $file);
                 $this->filteredLog->logger("Session was terminated!", 0, $file);
                 Shutdown::removeCallback('duration');

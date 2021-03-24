@@ -7,6 +7,7 @@ use danog\MadelineProto\Shutdown;
 use danog\MadelineProto\API;
 use danog\MadelineProto\Tools;
 use danog\MadelineProto\Magic;
+use danog\MadelineProto\MTProto;
 use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
@@ -36,10 +37,9 @@ define("LAUNCHES_FILE",  $dataFiles['launches']);
 define("CREATION_FILE",  $dataFiles['creation']);
 unset($dataFiles);
 
-$signalHandler = true;
 $signal        = null;
 
-if ($signalHandler && \defined('SIGINT')) {
+if (\defined('SIGINT')) {
     try {
         Loop::run(function () use (&$signal) {
             $siginit = Loop::onSignal(SIGINT, static function () use (&$signal) {
@@ -97,7 +97,7 @@ $safeConfig = safeConfig($robotConfig);
 Logger::log('', Logger::ERROR);
 Logger::log('=====================================================', Logger::ERROR);
 Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-Logger::log("Configurations: " . toJSON($robotConfig), Logger::ERROR);
+Logger::log("Configurations: " . toJSON($safeConfig), Logger::ERROR);
 unset($safeConfig);
 
 $launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
@@ -134,14 +134,12 @@ if (false && \defined('SIGINT')) {
     }
 }
 
-if ($signalHandler) {
-    Shutdown::addCallback(
-        static function (): void {
-            Logger::log('Duration dummy placeholder shutdown routine executed!', Logger::ERROR);
-        },
-        'duration'
-    );
-}
+Shutdown::addCallback(
+    static function (): void {
+        Logger::log('Duration dummy placeholder shutdown routine executed!', Logger::ERROR);
+    },
+    'duration'
+);
 
 $session    = getSessionName($robotConfig);
 $settings   = $robotConfig['mp'][0]['settings'] ?? [];
@@ -153,66 +151,83 @@ if ($newSession) {
 }
 \error_clear_last();
 
-if ($signalHandler) {
-    Shutdown::addCallback(
-        function () use ($mp, &$signal, $userDate, &$clean) {
-            $scriptEndTime = \microTime(true);
-            //$e = new \Exception;
-            //Logger::log($e->getTraceAsString(), Logger::ERROR);
-            if ($clean) {
-                // Clean Exit
-            }
+Shutdown::addCallback(
+    function () use ($mp, &$signal, $userDate, &$clean) {
+        $scriptEndTime = \microTime(true);
+        //$e = new \Exception;
+        //Logger::log($e->getTraceAsString(), Logger::ERROR);
+        if ($clean) {
+            // Clean Exit
+        }
+        $stopReason = 'nullapi';
+        if ($signal !== null) {
+            $stopReason = $signal;
+        } elseif (!$mp) {
+            // The external API class is not instansiated
             $stopReason = 'nullapi';
-            if ($signal !== null) {
-                $stopReason = $signal;
-            } elseif (!$mp) {
-                // The external API class is not instansiated
-                $stopReason = 'nullapi';
-            } elseif (!isset($mp->API)) {
-                $stopReason = 'destruct';
-            } elseif (!$mp->API->event_handler) {
-                // EventHandler is not set
-                // Is shutdown during the start() function execution
+        } elseif (!isset($mp->API)) {
+            $stopReason = 'destruct';
+        } elseif (!$mp->API->event_handler) {
+            // EventHandler is not set
+            // Is shutdown during the start() function execution
+            $error = \error_get_last();
+            if (isset($error)) {
+                Logger::log("LAST PHP ERROR: " . toJSON($error), Logger::ERROR);
+            }
+            $stopReason = isset($error) ? 'error' : 'destruct';
+        } else {
+            // EventHandler is set and instantiated
+            $eh = $mp->getEventHandler();
+            $stopReason = $eh->getStopReason();
+            if ($stopReason === 'UNKNOWN') {
                 $error = \error_get_last();
                 if (isset($error)) {
                     Logger::log("LAST PHP ERROR: " . toJSON($error), Logger::ERROR);
-                }
-                $stopReason = isset($error) ? 'error' : 'destruct';
-            } else {
-                // EventHandler is set and instantiated
-                $eh = $mp->getEventHandler();
-                $stopReason = $eh->getStopReason();
-                if ($stopReason === 'UNKNOWN') {
-                    $error = \error_get_last();
-                    if (isset($error)) {
-                        Logger::log("LAST PHP ERROR: " . toJSON($error), Logger::ERROR);
-                        $stopReason = isset($error) ? 'error' : $stopReason;
-                    } else {
-                        $stopReason = 'exit';
-                    }
+                    $stopReason = isset($error) ? 'error' : $stopReason;
+                } else {
+                    $stopReason = 'exit';
                 }
             }
+        }
 
-            Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
-            $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
-            $record = \Launch::floatToDate($record, $userDate);
-            Logger::log("Final Update Run Record: " . toJSON($record, false), Logger::ERROR);
-            $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
-            $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!";
-            Logger::log($msg, Logger::ERROR);
-        },
-        'duration'
-    );
-}
+        Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
+        $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
+        $record = \Launch::floatToDate($record, $userDate);
+        Logger::log("Final Update Run Record: " . toJSON($record, false), Logger::ERROR);
+        $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
+        $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!";
+        Logger::log($msg, Logger::ERROR);
+    },
+    'duration'
+);
+
 $authState = authorizationState($mp);
 Logger::log("Authorization State: " . authorizationStateDesc($authState));
 if ($authState === 4) {
     echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
-    Logger::log(PHP_EOL . "Invalid App, or the Session is corrupted!", Logger::ERROR);
+    Logger::log("Invalid App, or the Session is corrupted!", Logger::ERROR);
 }
-Logger::log("Is Authorized: " . ($mp->hasAllAuth() ? 'true' : 'false'), Logger::ERROR);
+$hasAllAuth = $mp->hasAllAuth();
+Logger::log("Is Authorized: " . ($hasAllAuth ? 'true' : 'false'), Logger::ERROR);
+if ($authState === MTProto::LOGGED_IN && !$hasAllAuth) {
+    echo (PHP_EOL . "The Session is terminated or corrupted!<br>" . PHP_EOL . PHP_EOL);
+    Logger::log("The Session is terminated or corrupted!", Logger::ERROR);
+}
+
+//$mp->async(true);
+//$mp->loop(function () use ($mp) {
+//$serialized = file_get_contents('authser.authkey');
+//$exportedAuth = unserialize($serialized);
+//yield $mp->start();
+//$exportedAuth = yield $mp->exportAuthorization();
+//$serialized   = serialize($exportedAuth);
+//file_put_contents('authser2.authkey', $serialized);
+//$authorization = yield $mp->importAuthorization($exportedAuth);
+//Logger::log("Authorization: " . toJSON($authorization), Logger::ERROR);
+//});
 
 safeStartAndLoop($mp, BaseEventHandler::class);
+
 \error_clear_last();
 echo ('Bye, bye!<br>' . PHP_EOL);
 Logger::log('Bye, bye!', Logger::ERROR);

@@ -25,6 +25,7 @@ junk*
 
 data/
 config.php
+authser.authkey
 
 .vscode/
 .idea/
