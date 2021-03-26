@@ -784,6 +784,8 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
 
                 yield $mp->setEventHandler($eventHandler);
                 $eh = $mp->getEventHandler($eventHandler);
+                $eh->setAPI($mp);
+                $eh->initialize($mp);
 
                 foreach ($genLoops as $genLoop) {
                     $genLoop->start(); // Do NOT use yield.

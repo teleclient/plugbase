@@ -25,6 +25,9 @@ require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
+includeHandlers($robotConfig['mp'][0]['handlers']);
+includeLoops($robotConfig['mp'][0]['loops']);
+
 $userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
 
 define("MEMORY_LIMIT", \ini_get('memory_limit'));
@@ -37,7 +40,7 @@ define("LAUNCHES_FILE",  $dataFiles['launches']);
 define("CREATION_FILE",  $dataFiles['creation']);
 unset($dataFiles);
 
-$signal        = null;
+$signal = null;
 
 if (\defined('SIGINT')) {
     try {
@@ -207,7 +210,7 @@ if ($authState === 4) {
     echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
     Logger::log("Invalid App, or the Session is corrupted!", Logger::ERROR);
 }
-$hasAllAuth = $mp->hasAllAuth();
+$hasAllAuth = $authState === -2 ? false : $mp->hasAllAuth();
 Logger::log("Is Authorized: " . ($hasAllAuth ? 'true' : 'false'), Logger::ERROR);
 if ($authState === MTProto::LOGGED_IN && !$hasAllAuth) {
     echo (PHP_EOL . "The Session is terminated or corrupted!<br>" . PHP_EOL . PHP_EOL);
@@ -357,6 +360,20 @@ function makeDataFiles(string $dirPath, array $baseNames): array
         $absPaths[$baseName] = $absPath;
     }
     return $absPaths;
+}
+
+function includeHandlers(array $handlers): void
+{
+    foreach ($handlers as $handler) {
+        include "handlers/$handler.php";
+    }
+}
+
+function includeLoops(array $loops): void
+{
+    foreach ($loops as $loop) {
+        include "loops/$loop.php";
+    }
 }
 
 /**

@@ -18,6 +18,8 @@ return [
             'phone'    => '+14328364939',
             'password' => '',
             'session'  => 'madeline.madeline',
+            'handlers' => ['BuiltinHandler', 'YourHandler'],
+            'loops'    => ['BuiltinLoop',    'YourLoop'],
             'settings' => [
                 'app_info' => [
                     'app_version' => SCRIPT_INFO,                     // <== Do not change!

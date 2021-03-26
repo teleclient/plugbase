@@ -2,18 +2,20 @@
 
 declare(strict_types=1);
 
+use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use function Amp\File\{get, put, exists, getSize};
 
-require_once 'Plugin.php';
-require_once 'AbstractPlugin.php';
-require_once 'plugins/BuiltinPlugin.php';
-require_once 'plugins/YourPlugin.php';
+require_once 'Handler.php';
+require_once 'AbstractHandler.php';
+require_once 'Loop.php';
+require_once 'AbstractLoop.php';
 
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {
-    private BuiltinPlugin $builtinPlugin;
-    private    YourPlugin $yourPlugin;
+    private API   $mp;
+    private array $handlers;
+    private array $loops;
 
     private float $handlerConstructed;
     private float $handlerUnserialized;
@@ -30,31 +32,60 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         parent::__construct($apiWrapper);
 
-        $this->robotConfig = $GLOBALS['robotConfig'];
-
         $now = microtime(true);
-
         $this->handlerConstructed  = $now;
         $this->handlerUnserialized = $now;
 
-        $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
-        $this->userDate = new \UserDate($this->robotConfig['zone']);
+        $this->robotConfig = $GLOBALS['robotConfig'];
+        $this->userDate    = new \UserDate($this->robotConfig['zone']);
+
         Logger::Log("EventHandler constructed at " . $this->userDate->format($now), Logger::ERROR);
 
-        $this->builtinPlugin = new BuiltinPlugin($this);
-        $this->yourPlugin    = new    YourPlugin($this);
+        $this->initBaseEventHandler($now);
     }
 
-    public function __wakeup_SAVED()
+    public function __wakeup()
     {
-        $this->robotConfig = $GLOBALS['robotConfig'];
-
         $now = microtime(true);
-
         $this->handlerUnserialized = $now;
 
-        $this->userDate = new \UserDate($this->robotConfig['zone']);
+        $this->robotConfig = $GLOBALS['robotConfig'];
+        $this->userDate    = new \UserDate($this->robotConfig['zone']);
+
         Logger::log('EventHandler unserialized at ' . $this->userDate->format($now), Logger::ERROR);
+
+        $this->initBaseEventHandler($now);
+    }
+
+    private function initBaseEventHandler(float $now)
+    {
+        Logger::log('EventHandler initialized at ' . $this->userDate->format($now), Logger::ERROR);
+
+        $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
+
+        $handlerClasses = $this->robotConfig['mp'][0]['handlers'];
+        $this->handlers = [];
+        foreach ($handlerClasses as $className) {
+            $newClass = new $className($this);
+            $created = get_class($newClass);
+            if ($created === false) {
+                throw new ErrorException("Invalid Handler Plugin name: '$className'");
+            }
+            Logger::log("Handler Plugin '$created' created!", Logger::ERROR);
+            $this->handlers[] = $newClass;
+        }
+
+        $loopClasses = $this->robotConfig['mp'][0]['loops'];
+        $this->loops = [];
+        foreach ($loopClasses as $className) {
+            $newClass = new $className($this);
+            $created = get_class($newClass);
+            if ($created === false) {
+                throw new ErrorException("Invalid Loop Plugin name: '$className'");
+            }
+            Logger::log("Loop Plugin '$created' created!", Logger::ERROR);
+            $this->loops[] = $newClass;
+        }
     }
 
     public function onStart(): \Generator
@@ -73,12 +104,30 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $self = yield $this->getSelf();
         yield $this->setSelf($self);
 
-        if (method_exists('BuiltinPlugin', 'onStart')) {
-            yield $this->builtinPlugin->onStart($this);
+        foreach ($this->handlers as $handler) {
+            $className = get_class($handler);
+            if (method_exists($handler, 'onStart')) {
+                Logger::log("Handler plugin '$className' onStart method invoked!", Logger::ERROR);
+                yield $handler->onStart($this);
+            } else {
+                Logger::log("Handler plugin '$className'  has no onStart method!", Logger::ERROR);
+            }
         }
-        if (method_exists('YourPlugin', 'onStart')) {
-            yield $this->yourPlugin->onStart($this);
+
+        foreach ($this->loops as $plugin) {
+            $className = get_class($plugin);
+            if (method_exists($plugin, 'onStart')) {
+                Logger::log("Loop plugin '$className' onStart method invoked!", Logger::ERROR);
+                yield $plugin->onStart($this);
+            } else {
+                Logger::log("Lopp plugin '$className'  has no onStart method!", Logger::ERROR);
+            }
         }
+    }
+
+    public function initialize(API $mp)
+    {
+        $this->mp = $mp;
     }
 
     public function onAny(array $update): \Generator
@@ -103,8 +152,13 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         }
         $vars = computeVars($update, $this);
 
-        $processed = yield ($this->builtinPlugin)($update, $vars, $this);
-        $processed = yield ($this->yourPlugin)($update, $vars, $this);
+        foreach ($this->handlers as $handler) {
+            $processed = yield ($handler($update, $vars, $this));
+        }
+
+        foreach ($this->loops as $loop) {
+            $processed = yield ($loop($update, $vars, $this));
+        }
     }
 
     public function getRobotConfig(): array

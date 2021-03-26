@@ -4,5 +4,6 @@ declare(strict_types=1);
 
 interface Loop
 {
-    function __invoke(): \Generator;
+    public function onStart(): \Generator;
+    public function __invoke(array $update, array $vars, BaseEventHandler $eh): \Generator;
 }

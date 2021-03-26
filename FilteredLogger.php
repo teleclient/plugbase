@@ -88,22 +88,26 @@ class FilteredLogger
                 //$API->logger->logger('Already got response for ' . $connection->outgoing_messages[$message_id]['_'] . ' with message ID ' . $message_id);
                 $entry = $entry;
             } elseif (strpos($entry, 'Could not resend ') !== false) {
+                $request = trim(substr($entry, 17));
                 $this->filteredLog->logger($entry, 0, $file);
-                $this->filteredLog->logger("Session was terminated!", 0, $file);
+                $this->filteredLog->logger("Could not resend request '$request'!", 0, $file);
                 Shutdown::removeCallback('duration');
                 Shutdown::removeCallback('restarter');
                 Shutdown::removeCallback(0);
                 Shutdown::removeCallback(1);
                 Shutdown::removeCallback(2);
                 Shutdown::removeCallback(3);
-                $buffer = @\ob_get_clean() ?: '';
-                $buffer .= '<html><body><h1>' . \htmlentities("Session was terminated!") . '</h1></body></html>';
-                \ignore_user_abort(true);
-                \header('Connection: close');
-                \header('Content-Type: text/html');
-                echo $buffer;
-                \flush();
+                if (PHP_SAPI !== 'cli') {
+                    $buffer = @\ob_get_clean() ?: '';
+                    $buffer .= '<html><body><h1>' . \htmlentities("Could not resend request '$request'!") . '</h1></body></html>';
+                    \ignore_user_abort(true);
+                    \header('Connection: close');
+                    \header('Content-Type: text/html');
+                    echo $buffer;
+                    \flush();
+                }
                 exit(0);
+            } elseif (strpos($entry, 'Could not resend ') !== false) {
             }
         }
         $entry = $this->levelDescr($level) . ": " . $entry;

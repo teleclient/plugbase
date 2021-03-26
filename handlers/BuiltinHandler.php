@@ -5,7 +5,7 @@ declare(strict_types=1);
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
 
-class BuiltinPlugin extends AbstractPlugin implements Plugin
+class BuiltinHandler extends AbstractHandler implements Handler
 {
     private BaseEventHandler $eh;
     private int              $totalUpdates;

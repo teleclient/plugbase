@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-class YourPlugin extends AbstractPlugin implements Plugin
+class YourLoop extends AbstractLoop implements Loop
 {
     private BaseEventHandler $eh;
 
