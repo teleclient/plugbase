@@ -2,23 +2,29 @@
 
 declare(strict_types=1);
 
-use danog\MadelineProto\Loop\GenericLoop;
+use danog\MadelineProto\Loop\Generic\GenericLoop;
 use danog\MadelineProto\Logger;
+use danog\MadelineProto\API;
 
 class BuiltinLoop extends AbstractLoop implements Loop
 {
     public $loop;
 
+    public function __sleep()
+    {
+        return [];
+    }
+
     public function onStart(): \Generator
     {
         $eh = $this->eh;
-        $mp = $eh;
+        $mp = $this->mp;
         $userDate = $this->userDate;
         $this->loop = new GenericLoop(
             $mp,
             function () use ($eh, $userDate) {
-                $eventHandler = $this->eh->getEventHandler();
-                $now = $userDate->milli();
+                $eventHandler = $eh->getEventHandler();
+                $now = $userDate->toMilli();
                 if ($eh->getLoopState() && $now % 60 === 0) {
                     $msg = 'Time is ' . $now . '!';
                     yield $eh->logger($msg, Logger::ERROR);
@@ -41,11 +47,17 @@ class BuiltinLoop extends AbstractLoop implements Loop
             },
             'Repeating Loop'
         );
+
+        $this->loop->start();
         return;
         yield;
     }
 
-    public function __invoke(array $update, array $vars, BaseEventHandler $eh): \Generator
+    public function loop()
+    {
+    }
+
+    public function __invoke(array $update, array $vars): \Generator
     {
         // Handle $update.  Use $vars if necessary
         // .....

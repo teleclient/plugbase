@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use danog\madelineproto\API;
 use danog\madelineproto\Logger;
+use danog\madelineproto\MTProto;
+use danog\madelineproto\Magic;
 use function Amp\File\{get, put, exists, getSize};
 
 require_once 'Handler.php';
@@ -113,21 +115,38 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
                 Logger::log("Handler plugin '$className'  has no onStart method!", Logger::ERROR);
             }
         }
+    }
+
+    public function finalizeStart(API $mp): \Generator
+    {
+        $this->mp = $mp;
+        $mpVersion = MTProto::RELEASE . ' (' . MTProto::V . ', ' . Magic::$revision . ')';
+        Logger::log("MadelineProto version: '$mpVersion'", Logger::ERROR);
+
+        /*
+        $loopClasses = $this->robotConfig['mp'][0]['loops'];
+        $this->loops = [];
+        foreach ($loopClasses as $className) {
+            $newClass = new $className($mp, $this);
+            $created = get_class($newClass);
+            if ($created === false) {
+                throw new ErrorException("Invalid Loop Plugin name: '$className'");
+            }
+            Logger::log("Loop Plugin '$created' created!", Logger::ERROR);
+            $this->loops[] = $newClass;
+        }
+        */
 
         foreach ($this->loops as $plugin) {
             $className = get_class($plugin);
+            $plugin->setAPI($mp);
             if (method_exists($plugin, 'onStart')) {
                 Logger::log("Loop plugin '$className' onStart method invoked!", Logger::ERROR);
-                yield $plugin->onStart($this);
+                yield $plugin->onStart();
             } else {
                 Logger::log("Lopp plugin '$className'  has no onStart method!", Logger::ERROR);
             }
         }
-    }
-
-    public function initialize(API $mp)
-    {
-        $this->mp = $mp;
     }
 
     public function onAny(array $update): \Generator

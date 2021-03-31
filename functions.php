@@ -783,9 +783,10 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
                 \closeConnection('Bot was started!');
 
                 yield $mp->setEventHandler($eventHandler);
-                $eh = $mp->getEventHandler($eventHandler);
-                $eh->setAPI($mp);
-                $eh->initialize($mp);
+                if (\method_exists($eventHandler, 'finalizeStart')) {
+                    $eh = $mp->getEventHandler($eventHandler);
+                    yield $eh->finalizeStart($mp);
+                }
 
                 foreach ($genLoops as $genLoop) {
                     $genLoop->start(); // Do NOT use yield.
@@ -818,4 +819,13 @@ function simpleStartAndLoop(API $mp, string $eventHandler): void
         \error_clear_last();
     });
     $mp->loop();
+}
+
+function secondsToNexMinute(float $now = null): int
+{
+    $now   = $now ?? \microtime(true);
+    $now   = (int) ($now * 1000000);
+    $next  = (int)ceil($now / 60) * 60;
+    $delay = $next - $now;
+    return $delay > 0 ? $delay : 60;
 }
