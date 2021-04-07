@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 use danog\MadelineProto\API;
 use danog\MadelineProto\Generic\GenericLoop;
+use danog\MadelineProto\Logger;
 use danog\MadelineProto\Loop\Impl\ResumableSignalLoop;
 
 abstract class AbstractLoop extends ResumableSignalLoop
@@ -25,12 +26,14 @@ abstract class AbstractLoop extends ResumableSignalLoop
 
     function __construct(API $mp, BaseEventHandler $eh)
     {
+        parent::__construct($mp);
         $this->mp = $mp;
         $this->eh = $eh;
         $this->robotConfig = $GLOBALS['robotConfig'];
         $this->userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
-        $className = get_class();
+        $className = get_class($this);
         $this->loopName = substr($className, 0, strlen($className) - 4);
+        $mp->logger("AbstractLoop constructor: {className => '$className'}");
     }
     //public function __construct($API, $callback, $name)
     //{
@@ -39,15 +42,24 @@ abstract class AbstractLoop extends ResumableSignalLoop
     //    $this->name = $name;
     //}
 
+    public function onStart(): \Generator
+    {
+        $this->start();
+        return;
+        yield;
+    }
+
     public function loop(): \Generator
     {
+        $loopName = $this->__toString();
+        $this->mp->logger("AbstractLoop loop: {className => '$loopName'}");
         //$callback = $this->callback;
         while (true) {
             $timeout = yield $this->pluggedLoop();
             if ($timeout === self::PAUSE) {
-                $this->API->logger->logger("Pausing {$this}", \danog\MadelineProto\Logger::VERBOSE);
+                $this->API->logger->logger("Pausing {$this}", Logger::ERROR);
             } elseif ($timeout > 0) {
-                $this->API->logger->logger("Pausing {$this} for {$timeout}", \danog\MadelineProto\Logger::VERBOSE);
+                $this->API->logger->logger("Pausing {$this} for {$timeout}", Logger::ERROR);
             }
             if ($timeout === self::STOP || yield $this->waitSignal($this->pause($timeout))) {
                 return;
@@ -57,7 +69,18 @@ abstract class AbstractLoop extends ResumableSignalLoop
 
     public function __toString(): string
     {
-        return $this->loopname;
+        $className = get_class($this);
+        $loopName = substr($className, 0, strlen($className) - 4);
+        $this->mp->logger("AbstractLoop toString: {loopName => '$loopName'}");
+        return $loopName;
+    }
+
+    public function __invoke(array $update, array $vars): \Generator
+    {
+        // Handle $update.  Use $vars if necessary
+        // .....
+        return false; // return true if $update is handled.
+        yield;
     }
 
     /**

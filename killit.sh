@@ -7,7 +7,7 @@ pkill lsphp
 #kill $(pgrep index)
 #pkill index
 #killall -v index
-#kill `ps -ef | grep index | grep -v grep | awk ‘{print $2}’`
+#kill -9 `ps -ef | grep index | grep -v grep | awk ‘{print $2}’`
 #ps aux | grep -i index
 #killall index
 #pgrep index

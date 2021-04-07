@@ -76,18 +76,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
             Logger::log("Handler Plugin '$created' created!", Logger::ERROR);
             $this->handlers[] = $newClass;
         }
-
-        $loopClasses = $this->robotConfig['mp'][0]['loops'];
-        $this->loops = [];
-        foreach ($loopClasses as $className) {
-            $newClass = new $className($this);
-            $created = get_class($newClass);
-            if ($created === false) {
-                throw new ErrorException("Invalid Loop Plugin name: '$className'");
-            }
-            Logger::log("Loop Plugin '$created' created!", Logger::ERROR);
-            $this->loops[] = $newClass;
-        }
     }
 
     public function onStart(): \Generator
@@ -123,7 +111,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $mpVersion = MTProto::RELEASE . ' (' . MTProto::V . ', ' . Magic::$revision . ')';
         Logger::log("MadelineProto version: '$mpVersion'", Logger::ERROR);
 
-        /*
         $loopClasses = $this->robotConfig['mp'][0]['loops'];
         $this->loops = [];
         foreach ($loopClasses as $className) {
@@ -133,19 +120,14 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
                 throw new ErrorException("Invalid Loop Plugin name: '$className'");
             }
             Logger::log("Loop Plugin '$created' created!", Logger::ERROR);
-            $this->loops[] = $newClass;
-        }
-        */
-
-        foreach ($this->loops as $plugin) {
-            $className = get_class($plugin);
-            $plugin->setAPI($mp);
-            if (method_exists($plugin, 'onStart')) {
+            if (method_exists($newClass, 'onStart')) {
                 Logger::log("Loop plugin '$className' onStart method invoked!", Logger::ERROR);
-                yield $plugin->onStart();
+                yield $newClass->onStart();
             } else {
                 Logger::log("Lopp plugin '$className'  has no onStart method!", Logger::ERROR);
             }
+            $newClass->start();
+            $this->loops[] = $newClass;
         }
     }
 

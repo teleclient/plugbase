@@ -10,6 +10,18 @@ class YourLoop extends AbstractLoop implements Loop
         yield;
     }
 
+    public function loop(): \Generator
+    {
+        return;
+        yield;
+    }
+
+    protected function pluggedLoop(): \Generator
+    {
+        return;
+        yield;
+    }
+
     public function __invoke(array $update, array $vars): \Generator
     {
         // Handle $update.  Use $vars if necessary

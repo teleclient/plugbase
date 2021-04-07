@@ -93,9 +93,8 @@ function includeMadeline(string $source = 'phar', string $param = null)
             if (!\file_exists('madeline.php')) {
                 \copy('https://phar.madelineproto.xyz/madeline.php', 'madeline.php');
             }
-            if ($param) {
-                define('MADELINE_BRANCH', $param);
-            }
+            $param = $param ?? '5.1.34';
+            define('MADELINE_BRANCH', $param);
             include 'madeline.php';
             break;
         case 'composer':

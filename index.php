@@ -12,12 +12,12 @@ use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
 define("SCRIPT_START_TIME", \microtime(true));
-define('SCRIPT_INFO',       'BASE_PLG V1.0.1'); // <== Do not change!
+define('SCRIPT_INFO',       'BASE_PLG V1.1.0'); // <== Do not change!
 $clean = false;
 
 require_once 'functions.php';
 initPhp();
-includeMadeline('phar');
+includeMadeline('composer');
 
 require_once 'UserDate.php';
 require_once 'FilteredLogger.php';
