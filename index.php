@@ -11,12 +11,13 @@ use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
 define("SCRIPT_START_TIME", \microtime(true));
-define('SCRIPT_INFO',       'BASE_PLG V1.1.0'); // <== Do not change!
-$clean = false;
+define('SCRIPT_INFO',       'BASE_PLG V1.1.1'); // <== Do not change!
+$clean  = false;
+$signal = null; // DON NOT DELETE
 
 require_once 'functions.php';
 initPhp();
-includeMadeline('composer');
+includeMadeline('phar', '5.1.34');
 
 require_once 'UserDate.php';
 require_once 'FilteredLogger.php';
@@ -38,8 +39,6 @@ define("STARTUPS_FILE",  $dataFiles['startups']);
 define("LAUNCHES_FILE",  $dataFiles['launches']);
 define("CREATION_FILE",  $dataFiles['creation']);
 unset($dataFiles);
-
-$signal = null;
 
 if (\defined('SIGINT')) {
     try {
@@ -181,7 +180,7 @@ Shutdown::addCallback(
             // EventHandler is set and instantiated
             $eh = $mp->getEventHandler();
             foreach ($eh->getLoops() as $loopName => $loopObj) {
-                $loopObj->__destruct();
+                unset($loopObj);
             }
             $stopReason = $eh->getStopReason();
             if ($stopReason === 'UNKNOWN') {
@@ -283,14 +282,12 @@ function acquireScriptLock(string $sessionName, &$lock, $retryCount = 10): bool
             $locked = \flock($lock, LOCK_EX | LOCK_NB);
             if (!$locked) {
                 if ($try++ >= $retryCount) {
-                    //Logger::log("Locking file '$lockfile' failed!", Logger::ERROR); // Bot is running!
                     $acquired = false;
                     return $acquired;
                 }
                 \sleep(1);
             }
         }
-        //Logger::log("File '$lockfile' successfully locked!", Logger::ERROR); // Bot is not running!
         return $acquired;
     }
     return $acquired;

@@ -7,7 +7,9 @@ use danog\MadelineProto\Shutdown;
 
 class BuiltinHandler extends AbstractHandler implements Handler
 {
-    const STOPPING_MSG = 'Robot is stopping ...';
+    const STOPPING_MSG   = 'Robot is stopping ...';
+    const RESTARTING_MSG = 'Robot is restarting ...';
+    const LOGGINGOUT_MSG = 'Robot is logging out ...';
 
     private BaseEventHandler $eh;
     private int              $totalUpdates;
@@ -79,16 +81,20 @@ class BuiltinHandler extends AbstractHandler implements Handler
             }
 
             //Function: Finnish executing the Restart command.
-            if ($vars['msgText'] === 'Robot is restarting ...') {
+            if ($vars['msgText'] === self::RESTARTING_MSG) {
                 $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->restart();
                 return true;
             }
 
             //Function: Finnish executing the Logout command.
-            if ($vars['msgText'] === 'Robot is logging out ...') {
+            if ($vars['msgText'] === self::LOGGINGOUT_MSG) {
                 $eh->logger('Robot logged out at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->logout();
+                if (Shutdown::removeCallback('restarter')) {
+                    $eh->logger('Self-Restarter disabled.', Logger::ERROR);
+                }
+                yield $eh->stop();
                 return true;
             }
         }
@@ -275,21 +281,6 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $text = "The notif is $notifState$notifAge";
                 yield respond($eh, $peer, $msgId, $text);
                 break;
-            case 'loop_OLD':
-                $param = strtolower($params[0] ?? '');
-                if (($param === 'on' || $param === 'off' || $param === 'state') && count($params) === 1) {
-                    $loopStatePrev = $eh->getLoopState();
-                    $loopState = $param === 'on' ? true : ($param === 'off' ? false : $loopStatePrev);
-                    $text = 'The loop is ' . ($loopState ? 'ON' : 'OFF') . '!';
-                    yield respond($eh, $peer, $msgId, $text, $editMessage);
-                    if ($loopState !== $loopStatePrev) {
-                        $eh->setLoopState($loopState);
-                    }
-                } else {
-                    $text = "The argument must be 'on', 'off, or 'state'.";
-                    yield respond($eh, $peer, $msgId, $text, $editMessage);
-                }
-                break;
             case 'loop':
                 $params      = $command['params'];
                 $loopname    = strtolower($params[0] ?? '');
@@ -348,23 +339,18 @@ class BuiltinHandler extends AbstractHandler implements Handler
                     $eh->logger("Command '/restart' is only avaiable under webservers. Ignored!  " . $eh->formatTime() . '!', Logger::ERROR);
                     break;
                 }
-                $text = 'Robot is restarting ...';
-                $eh->logger($text, Logger::ERROR);
-                yield respond($eh, $peer, $msgId, $text);
+                $eh->logger(self::RESTARTING_MSG, Logger::ERROR);
+                yield respond($eh, $peer, $msgId, self::RESTARTING_MSG);
                 $eh->setStopReason('restart');
-                //$eh->restart();
                 break;
             case 'logout':
-                $text = 'Robot is logging out ...';
-                $eh->logger($text, Logger::ERROR);
-                yield respond($eh, $peer, $msgId, $text);
+                $eh->logger(self::RESTARTING_MSG, Logger::ERROR);
+                yield respond($eh, $peer, $msgId, self::RESTARTING_MSG);
                 $eh->setStopReason('logout');
-                //$eh->logout();
                 break;
             case 'stop':
                 $eh->logger(self::STOPPING_MSG, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, self::STOPPING_MSG);
-                $eh->logger(self::STOPPING_MSG, Logger::ERROR);
                 $eh->setStopReason($verb);
                 break;
             default:

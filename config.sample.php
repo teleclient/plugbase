@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 return [
     'admins'     => [], // Robot Id will authomatically be included
-    //'ownerid'  => 1234,
-    //'officeid' => 1234,
     //'host'     => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
     'zone'     => 'Asia/Tehran',
     'prefixes' => '!/',
