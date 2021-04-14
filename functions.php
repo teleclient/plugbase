@@ -118,27 +118,26 @@ function computeVars(array $update, object $eh): array
     $vars['peer']      = $update['message']['to_id'] ?? null;
     $vars['isOutward'] = $update['message']['out'] ?? false;
 
-    $vars['config']    = $eh->getRobotConfig();
-    $vars['robotId']   = $eh->getRobotId();
-    $vars['adminIds']  = $eh->getAdminIds();
-    $vars['officeId']  = $eh->getOfficeId();
     $vars['execute']   = $eh->canExecute();
-    $vars['prefixes']  = $eh->getPrefixes();
+    //$vars['robotId']   = $eh->getRobotId();
+    //$vars['adminIds']  = $eh->getAdminIds();
+    //$vars['officeId']  = $eh->getOfficeId();
+    //$vars['prefixes']  = $eh->getPrefixes();
 
     $vars['fromRobot'] = $update['message']['out'] ?? false;
-    $vars['toRobot']   = $vars['peerType'] === 'peerUser'    && $vars['peer']['user_id']    === $vars['robotId'];
-    $vars['fromAdmin'] = in_array($vars['fromId'], $vars['adminIds']) || ['fromRobot'];
-    $vars['toOffice']  = $vars['peerType'] === 'peerChannel' && $vars['peer']['channel_id'] === $vars['officeId'];
+    $vars['toRobot']   = $vars['peerType'] === 'peerUser'    && $vars['peer']['user_id']    === $eh->getRobotId();
+    $vars['fromAdmin'] = in_array($vars['fromId'], $eh->getAdminIds()) || $vars['fromRobot'];
+    $vars['toOffice']  = $vars['peerType'] === 'peerChannel' && $vars['peer']['channel_id'] === $eh->getOfficeId();
 
     $vars['isCommand'] = ($update['_'] === 'updateNewMessage') && $vars['msgText'] &&
-        (strpos($vars['prefixes'], $vars['msgText'][0]) !== false) && $vars['execute'] &&
+        (strpos($eh->getPrefixes(), $vars['msgText'][0]) !== false) && $vars['execute'] &&
         ($vars['fromRobot'] && $vars['toRobot'] || $vars['fromAdmin'] && $vars['toOffice']);
 
     if ($vars['isCommand']) {
-        $vars['command']  = \parseCommand($update, $vars['config']['prefixes'] ?? '/!');
-        $vars['verb']     = $vars['command']['verb'];
+        $vars['command'] = \parseCommand($update, $eh->getPrefixes());
+        $vars['verb']    = $vars['command']['verb'];
     } else {
-        $vars['verb']     = '';
+        $vars['verb']    = '';
     }
 
     return $vars;
@@ -820,6 +819,7 @@ function simpleStartAndLoop(API $mp, string $eventHandler): void
     $mp->loop();
 }
 
+/*
 function secondsToNexMinute(float $now = null): int
 {
     $now   = $now ?? \microtime(true);
@@ -827,4 +827,15 @@ function secondsToNexMinute(float $now = null): int
     $next  = (int)ceil($now / 60) * 60;
     $delay = $next - $now;
     return $delay > 0 ? $delay : 60;
+}
+*/
+function secondsToNexMinute(float $now = null): int
+{
+    $now = $now ?? \microtime(true);
+    $now  = (int) ($now * 1000000);
+    $next = (int)ceil($now / 60000000) * 60000000;
+    $diff = ($next - $now);
+    $secs = (int)round($diff / 1000000);
+    //echo ("{now: $now, next: $next, diff: $diff, secs: $secs}" . PHP_EOL);
+    return $secs > 0 ? $secs : 60;
 }

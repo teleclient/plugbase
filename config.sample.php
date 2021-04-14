@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'admins'     => [], // Robot Id will be authomatically be included
+    'admins'     => [], // Robot Id will authomatically be included
     //'ownerid'  => 1234,
     //'officeid' => 1234,
     //'host'     => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
@@ -13,11 +13,11 @@ return [
     'maxrestarts' => 10,
     'mp'   => [
         0 => [
+            'session'      => 'madeline.madeline',
             'filterlog'    => false,
             'notification' => 'off',
             'phone'    => '+14328364939',
             'password' => '',
-            'session'  => 'madeline.madeline',
             'handlers' => ['BuiltinHandler', 'YourHandler'],
             'loops'    => ['BuiltinLoop',    'YourLoop'],
             'settings' => [
@@ -28,6 +28,7 @@ return [
                 ],
                 'logger' => [
                     'logger'       => \danog\MadelineProto\Logger::FILE_LOGGER,
+                    'logger_param' => __DIR__ . '/MadelineProto.log',
                     'logger_level' => \danog\MadelineProto\Logger::NOTICE,
                     'max_size'     => 100 * 1024 * 1024
                 ],

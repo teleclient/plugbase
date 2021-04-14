@@ -7,6 +7,8 @@ use danog\MadelineProto\Shutdown;
 
 class BuiltinHandler extends AbstractHandler implements Handler
 {
+    const STOPPING_MSG = 'Robot is stopping ...';
+
     private BaseEventHandler $eh;
     private int              $totalUpdates;
 
@@ -34,7 +36,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 'peer'    => $dest,
                 'message' => $text
             ]);
-            yield $eh->logger($text, Logger::ERROR);
+            $eh->logger($text, Logger::ERROR);
             if ($notifAge > 0) {
                 $msgid = $result['updates'][1]['message']['id'];
                 $eh->callFork((function () use ($eh, $msgid, $notifAge) {
@@ -44,9 +46,9 @@ class BuiltinHandler extends AbstractHandler implements Handler
                             'revoke' => true,
                             'id'     => [$msgid]
                         ]);
-                        yield $eh->logger('Robot\'s startup message is deleted.', Logger::ERROR);
+                        $eh->logger('Robot\'s startup message is deleted.', Logger::ERROR);
                     } catch (\Exception $e) {
-                        yield $eh->logger($e, Logger::ERROR);
+                        $eh->logger($e, Logger::ERROR);
                     }
                 })());
             }
@@ -67,25 +69,25 @@ class BuiltinHandler extends AbstractHandler implements Handler
         if ($eh->newMessage($update)) {
 
             //Function: Finnish executing the Stop command.
-            if ($vars['msgText'] === 'Robot is stopping ...') {
+            if ($vars['msgText'] === self::STOPPING_MSG) {
                 if (Shutdown::removeCallback('restarter')) {
-                    yield $eh->logger('Self-Restarter disabled.', Logger::ERROR);
+                    $eh->logger('Self-Restarter disabled.', Logger::ERROR);
                 }
-                yield $eh->logger('Robot stopped at ' . $eh->formatTime() . '!', Logger::ERROR);
+                $eh->logger('Robot stopped at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->stop();
                 return true;
             }
 
             //Function: Finnish executing the Restart command.
             if ($vars['msgText'] === 'Robot is restarting ...') {
-                yield $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
+                $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->restart();
                 return true;
             }
 
             //Function: Finnish executing the Logout command.
             if ($vars['msgText'] === 'Robot is logging out ...') {
-                yield $eh->logger('Robot logged out at ' . $eh->formatTime() . '!', Logger::ERROR);
+                $eh->logger('Robot logged out at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->logout();
                 return true;
             }
@@ -94,11 +96,12 @@ class BuiltinHandler extends AbstractHandler implements Handler
         if (!hasText($update) || $update['_'] !== 'updateNewMessage') {
             return false;
         }
-        if (!isset($vars['msgText'][0]) || strpos($vars['prefixes'], $vars['msgText'][0]) === false) {
+        if (!isset($vars['msgText'][0]) || strpos($eh->getPrefixes(), $vars['msgText'][0]) === false) {
             return false;
         }
 
         extract($vars);
+        //$eh->logger("vars: " . toJSON($vars), Logger::ERROR);
 
         $executed = false;
         switch ($fromRobot ? $verb : '') {
@@ -115,14 +118,13 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $executed = true;
                 break;
         }
-
         switch ($executed ? '' : $verb) {
             case '':
                 break;
             case 'help':
                 $text = getHelpText($eh->getPrefixes());
                 yield respond($eh, $peer, $msgId, $text);
-                yield $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
+                $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'status':
                 $sessionCreation = yield $eh->getSessionCreation();
@@ -177,7 +179,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $status .= 'Previous Launch Duration: ' . $lastLaunchDuration . '<br>';
                 $status .= 'Previous Peak Memory: '     . $lastPeakMemory . '<br>';
                 yield respond($eh, $peer, $msgId, $status);
-                yield $eh->logger("Command '/status' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
+                $eh->logger("Command '/status' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'stats':
                 $text   = "Preparing statistics ....";
@@ -230,7 +232,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 yield respond($eh, $peer, $resMsgId, $stats, true);
                 break;
             case 'crash':
-                yield $eh->logger("Purposefully crashing the script....", Logger::ERROR);
+                $eh->logger("Purposefully crashing the script....", Logger::ERROR);
                 $e = new \ErrorException('Artificial exception generated for testing the robot.');
                 //yield $this->echo($e->getTraceAsString($e) . PHP_EOL);
                 throw $e;
@@ -243,7 +245,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 } catch (\Exception $e) {
                     unset($arr);
                     $text = $e->getMessage();
-                    yield $eh->logger($text, Logger::ERROR);
+                    $eh->logger($text, Logger::ERROR);
                 }
                 break;
             case 'notif':
@@ -273,30 +275,96 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $text = "The notif is $notifState$notifAge";
                 yield respond($eh, $peer, $msgId, $text);
                 break;
+            case 'loop_OLD':
+                $param = strtolower($params[0] ?? '');
+                if (($param === 'on' || $param === 'off' || $param === 'state') && count($params) === 1) {
+                    $loopStatePrev = $eh->getLoopState();
+                    $loopState = $param === 'on' ? true : ($param === 'off' ? false : $loopStatePrev);
+                    $text = 'The loop is ' . ($loopState ? 'ON' : 'OFF') . '!';
+                    yield respond($eh, $peer, $msgId, $text, $editMessage);
+                    if ($loopState !== $loopStatePrev) {
+                        $eh->setLoopState($loopState);
+                    }
+                } else {
+                    $text = "The argument must be 'on', 'off, or 'state'.";
+                    yield respond($eh, $peer, $msgId, $text, $editMessage);
+                }
+                break;
+            case 'loop':
+                $params      = $command['params'];
+                $loopname    = strtolower($params[0] ?? '');
+                $action      = strtolower($params[1] ?? '');
+                $paramsCount = count($params);
+                if (
+                    $paramsCount === 2 && $action !== 'on' && $action !== 'off' && $action !== 'state' ||
+                    $paramsCount === 1 && $action !== 'on' && $action !== 'off' && $action !== ''
+                ) {
+                    $text = "The loop action must be one of 'pause', 'resume', or 'state'.";
+                    $eh->logger($text, Logger::ERROR);
+                    yield respond($eh, $peer, $msgId, $text);
+                    break;
+                }
+                $loopObj = $eh->getLoops()[$loopname] ?? null;
+                if (!$loopObj) {
+                    $text = "Unknown loop '$loopname'!";
+                    $eh->logger($text, Logger::ERROR);
+                    yield respond($eh, $peer, $msgId, $text);
+                    break;
+                }
+                if (false) {
+                    if ($action === 'off') {
+                        yield $loopObj->pause();
+                        $text = "The $loopname loop plugin pauseed!";
+                        yield respond($eh, $peer, $msgId, $text);
+                        $eh->logger($text, Logger::ERROR);
+                    } elseif ($action === 'on') {
+                        yield $loopObj->resume();
+                        $text = "The $loopname loop plugin resumed!";
+                        yield respond($eh, $peer, $msgId, $text);
+                        $eh->logger($text, Logger::ERROR);
+                    } elseif ($action === 'state') {
+                        $text = "The command  '/loop $loopname state' received!";
+                        yield respond($eh, $peer, $msgId, $text);
+                        $eh->logger($text, Logger::ERROR);
+                    }
+                }
+                $loopStatePrev = $eh->getLoopState($loopname);
+                $loopState     = $action === 'on' ? true : ($action === 'off' ? false : $loopStatePrev);
+                $text = "The $loopname loop plugin state is " . ($loopState ? 'ON' : 'OFF') . '!';
+                $eh->logger($text, Logger::ERROR);
+                yield respond($eh, $peer, $msgId, $text);
+                if ($loopState !== $loopStatePrev) {
+                    $eh->setLoopState($loopname, $loopState);
+                }
+                if ($loopStatePrev === false && $loopState === true) {
+                    //$loopObj->resume();
+                }
+                $eh->logger("The command '$msgText' successfully executed!", Logger::ERROR);
+                break;
             case 'restart':
                 if (PHP_SAPI === 'cli') {
                     $text = "Command '/restart' is only avaiable under webservers. Ignored!";
                     yield respond($eh, $peer, $msgId, $text);
-                    yield $eh->logger("Command '/restart' is only avaiable under webservers. Ignored!  " . $eh->formatTime() . '!', Logger::ERROR);
+                    $eh->logger("Command '/restart' is only avaiable under webservers. Ignored!  " . $eh->formatTime() . '!', Logger::ERROR);
                     break;
                 }
                 $text = 'Robot is restarting ...';
-                yield $eh->logger($text, Logger::ERROR);
+                $eh->logger($text, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->setStopReason('restart');
                 //$eh->restart();
                 break;
             case 'logout':
                 $text = 'Robot is logging out ...';
-                yield $eh->logger($text, Logger::ERROR);
+                $eh->logger($text, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->setStopReason('logout');
                 //$eh->logout();
                 break;
             case 'stop':
-                $text = 'Robot is stopping ...';
-                yield respond($eh, $peer, $msgId, $text);
-                yield $eh->logger($text, Logger::ERROR);
+                $eh->logger(self::STOPPING_MSG, Logger::ERROR);
+                yield respond($eh, $peer, $msgId, self::STOPPING_MSG);
+                $eh->logger(self::STOPPING_MSG, Logger::ERROR);
                 $eh->setStopReason($verb);
                 break;
             default:

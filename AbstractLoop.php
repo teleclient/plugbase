@@ -15,14 +15,10 @@ abstract class AbstractLoop extends ResumableSignalLoop
     const PAUSE    = null;
     const CONTINUE = 0;
 
-    //protected $callback;
-    //protected $name;
-
     protected API              $mp;
     protected BaseEventHandler $eh;
     protected array    $robotConfig;
     protected UserDate $userDate;
-    protected string   $loopName;
 
     function __construct(API $mp, BaseEventHandler $eh)
     {
@@ -31,37 +27,37 @@ abstract class AbstractLoop extends ResumableSignalLoop
         $this->eh = $eh;
         $this->robotConfig = $GLOBALS['robotConfig'];
         $this->userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
-        $className = get_class($this);
-        $this->loopName = substr($className, 0, strlen($className) - 4);
-        $mp->logger("AbstractLoop constructor: {className => '$className'}");
+        $this->eh->logger("AbstractLoop constructor for '{$this}' is invoked", Logger::ERROR);
     }
-    //public function __construct($API, $callback, $name)
-    //{
-    //    $this->API = $API;
-    //    $this->callback = $callback->bindTo($this);
-    //    $this->name = $name;
-    //}
+
+    function __sleep(): array
+    {
+        return [];
+    }
 
     public function onStart(): \Generator
     {
         $this->start();
+        if (method_exists($this, 'onStart')) {
+            yield $this->onStart();
+        }
         return;
-        yield;
     }
 
     public function loop(): \Generator
     {
-        $loopName = $this->__toString();
-        $this->mp->logger("AbstractLoop loop: {className => '$loopName'}");
-        //$callback = $this->callback;
+        $state = $this->eh->getLoopState((string)$this);
+        $this->eh->logger("AbstractLoop loop invoked for '{$this}' with " . ($state ? 'ON' : 'OFF') . " state!", Logger::ERROR);
         while (true) {
-            $timeout = yield $this->pluggedLoop();
+            $state   = $this->eh->getLoopState((string)$this);
+            $timeout = yield $this->pluggedLoop($state);
             if ($timeout === self::PAUSE) {
-                $this->API->logger->logger("Pausing {$this}", Logger::ERROR);
+                //$this->eh->logger->logger("Pausing {$this} loop!", Logger::ERROR);
             } elseif ($timeout > 0) {
-                $this->API->logger->logger("Pausing {$this} for {$timeout}", Logger::ERROR);
+                //$this->eh->logger->logger("Pausing {$this} loop for {$timeout} seconds!", Logger::ERROR);
             }
             if ($timeout === self::STOP || yield $this->waitSignal($this->pause($timeout))) {
+                //$this->eh->logger("The {$this} loop plugin exited!", Logger::ERROR);
                 return;
             }
         }
@@ -70,9 +66,8 @@ abstract class AbstractLoop extends ResumableSignalLoop
     public function __toString(): string
     {
         $className = get_class($this);
-        $loopName = substr($className, 0, strlen($className) - 4);
-        $this->mp->logger("AbstractLoop toString: {loopName => '$loopName'}");
-        return $loopName;
+        $loopName  = substr($className, 0, strlen($className) - 4);
+        return strtolower($loopName);
     }
 
     public function __invoke(array $update, array $vars): \Generator
@@ -81,6 +76,30 @@ abstract class AbstractLoop extends ResumableSignalLoop
         // .....
         return false; // return true if $update is handled.
         yield;
+    }
+
+    /**
+     * Log a message.
+     *
+     * @param mixed  $param Message to log
+     * @param int    $level Logging level
+     * @param string $file  File that originated the message
+     *
+     * @return void
+     */
+    protected function logger($param, int $level = Logger::NOTICE, string $file = ''): void
+    {
+        $this->eh->getLogger()->logger($param, $level, $file);
+    }
+
+    static function secondsToNexMinute(float $now = null): int
+    {
+        $now = $now ?? \microtime(true);
+        $now  = (int) ($now * 1000000);
+        $next = (int)ceil($now / 60000000) * 60000000;
+        $diff = ($next - $now);
+        $secs = (int)round($diff / 1000000);
+        return $secs > 0 ? $secs : 60;
     }
 
     /**
@@ -97,5 +116,5 @@ abstract class AbstractLoop extends ResumableSignalLoop
      * @param callable                 $callback Callback to run
      * @param string                   $name     Fetcher name
      */
-    abstract protected function pluggedLoop(): \Generator;
+    abstract protected function pluggedLoop(bool $state): \Generator;
 }

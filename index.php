@@ -5,7 +5,6 @@ declare(strict_types=1);
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
 use danog\MadelineProto\API;
-use danog\MadelineProto\Tools;
 use danog\MadelineProto\Magic;
 use danog\MadelineProto\MTProto;
 use Amp\Loop;
@@ -25,8 +24,8 @@ require_once 'Launch.php';
 require_once 'BaseEventHandler.php';
 
 $robotConfig = include('config.php');
-includeHandlers($robotConfig['mp'][0]['handlers']);
-includeLoops($robotConfig['mp'][0]['loops']);
+includeHandlers($robotConfig);
+includeLoops($robotConfig);
 
 $userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
 
@@ -181,6 +180,9 @@ Shutdown::addCallback(
         } else {
             // EventHandler is set and instantiated
             $eh = $mp->getEventHandler();
+            foreach ($eh->getLoops() as $loopName => $loopObj) {
+                $loopObj->__destruct();
+            }
             $stopReason = $eh->getStopReason();
             if ($stopReason === 'UNKNOWN') {
                 $error = \error_get_last();
@@ -192,7 +194,6 @@ Shutdown::addCallback(
                 }
             }
         }
-
         Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
         $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
         $record = \Launch::floatToDate($record, $userDate);
@@ -216,18 +217,6 @@ if ($authState === MTProto::LOGGED_IN && !$hasAllAuth) {
     echo (PHP_EOL . "The Session is terminated or corrupted!<br>" . PHP_EOL . PHP_EOL);
     Logger::log("The Session is terminated or corrupted!", Logger::ERROR);
 }
-
-//$mp->async(true);
-//$mp->loop(function () use ($mp) {
-//$serialized = file_get_contents('authser.authkey');
-//$exportedAuth = unserialize($serialized);
-//yield $mp->start();
-//$exportedAuth = yield $mp->exportAuthorization();
-//$serialized   = serialize($exportedAuth);
-//file_put_contents('authser2.authkey', $serialized);
-//$authorization = yield $mp->importAuthorization($exportedAuth);
-//Logger::log("Authorization: " . toJSON($authorization), Logger::ERROR);
-//});
 
 safeStartAndLoop($mp, BaseEventHandler::class);
 
@@ -362,17 +351,21 @@ function makeDataFiles(string $dirPath, array $baseNames): array
     return $absPaths;
 }
 
-function includeHandlers(array $handlers): void
+function includeHandlers(array $robotConfig): void
 {
-    foreach ($handlers as $handler) {
-        include "handlers/$handler.php";
+    $handlerNames = $robotConfig['mp'][0]['handlers'] ?? [];
+    foreach ($handlerNames as $handlerName) {
+        $handlerFileName = 'handlers/' . $handlerName . 'Handler.php';
+        require $handlerFileName;
     }
 }
 
-function includeLoops(array $loops): void
+function includeLoops(array $robotConfig): void
 {
-    foreach ($loops as $loop) {
-        include "loops/$loop.php";
+    $loopNames = $robotConfig['mp'][0]['loops'] ?? [];
+    foreach ($loopNames as $loopName) {
+        $loopFileName = 'loops/' . $loopName . 'Loop.php';
+        require $loopFileName;
     }
 }
 

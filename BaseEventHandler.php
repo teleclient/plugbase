@@ -16,6 +16,7 @@ require_once 'AbstractLoop.php';
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {
     private API   $mp;
+
     private array $handlers;
     private array $loops;
 
@@ -65,16 +66,18 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
         $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
 
-        $handlerClasses = $this->robotConfig['mp'][0]['handlers'];
+        $handlerNames   = $this->getHandlerNames();
         $this->handlers = [];
-        foreach ($handlerClasses as $className) {
+        foreach ($handlerNames as $handlerName) {
+            $className = $handlerName . 'Handler';
             $newClass = new $className($this);
             $created = get_class($newClass);
             if ($created === false) {
+                removeShutdownHandlers();
                 throw new ErrorException("Invalid Handler Plugin name: '$className'");
             }
             Logger::log("Handler Plugin '$created' created!", Logger::ERROR);
-            $this->handlers[] = $newClass;
+            $this->handlers[$handlerName] = $newClass;
         }
     }
 
@@ -83,7 +86,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->canExecute = false;
         $this->stopReason = "UNKNOWN";
 
-        //Logger::log(toJSON($this->robotConfig));
         $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
         $record = \Launch::floatToDate($record, $this->userDate);
         Logger::log("EventHandler Update Run Record: " . toJSON($record, false), Logger::ERROR);
@@ -94,7 +96,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $self = yield $this->getSelf();
         yield $this->setSelf($self);
 
-        foreach ($this->handlers as $handler) {
+        foreach ($this->handlers as $handlerName => $handler) {
             $className = get_class($handler);
             if (method_exists($handler, 'onStart')) {
                 Logger::log("Handler plugin '$className' onStart method invoked!", Logger::ERROR);
@@ -111,12 +113,18 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $mpVersion = MTProto::RELEASE . ' (' . MTProto::V . ', ' . Magic::$revision . ')';
         Logger::log("MadelineProto version: '$mpVersion'", Logger::ERROR);
 
-        $loopClasses = $this->robotConfig['mp'][0]['loops'];
+        $loopNames = $this->getLoopNames(); // $this->robotConfig['mp'][0]['loops'];
         $this->loops = [];
-        foreach ($loopClasses as $className) {
-            $newClass = new $className($mp, $this);
-            $created = get_class($newClass);
+        foreach ($loopNames as $loopName) {
+            $className = $loopName . 'Loop';
+            if (!class_exists($className)) {
+                removeShutdownHandlers();
+                throw new ErrorException("Loop plugin class $className doesn't exist!", Logger::ERROR);
+            }
+            $newClass  = new $className($mp, $this);
+            $created   = get_class($newClass);
             if ($created === false) {
+                removeShutdownHandlers();
                 throw new ErrorException("Invalid Loop Plugin name: '$className'");
             }
             Logger::log("Loop Plugin '$created' created!", Logger::ERROR);
@@ -127,20 +135,22 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
                 Logger::log("Lopp plugin '$className'  has no onStart method!", Logger::ERROR);
             }
             $newClass->start();
-            $this->loops[] = $newClass;
+            $this->loops[strtolower($loopName)] = $newClass;
         }
     }
 
     public function onAny(array $update): \Generator
     {
         $verb = $this->possiblyVerb($update, $this->getPrefixes(), 30);
-        $isNew = floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
+        //$msgFront = substr($update['message']['message'] ?? '', 0, 30);
+        //$this->logger("PossibleVerb: '$verb', newMessage: " . ($this->newMessage($update) ? 'yes' : 'no') . "  msgType: {$update['_']}  msg: '$msgFront'", Logger::ERROR);
+        //$isNew = floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
         if (!$this->canExecute && $verb !== '' && $this->newMessage($update)) {
             $this->newMessage($update);
             $this->canExecute = true;
             $this->logger('Command-Processing engine started at ' . $this->formatTime(), Logger::ERROR);
         }
-        $vars = ['verb' => $verb];
+        //$vars = ['verb' => $verb];
         if ($verb !== '') {
             $msgDate   = $this->formatTime(floatval($update['message']['date']));
             $nowDate   = $this->formatTime(\microtime(true));
@@ -153,12 +163,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         }
         $vars = computeVars($update, $this);
 
-        foreach ($this->handlers as $handler) {
+        foreach ($this->handlers as $handlerName => $handler) {
             $processed = yield ($handler($update, $vars, $this));
-        }
-
-        foreach ($this->loops as $loop) {
-            $processed = yield ($loop($update, $vars, $this));
         }
     }
 
@@ -235,7 +241,17 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     function getSessionName(): string
     {
-        return $this->robotConfig['mp']['0']['session'] ?? 'madeline.madeline';
+        return $this->robotConfig['mp'][0]['session'] ?? 'madeline.madeline';
+    }
+
+    function getLoopNames(): array
+    {
+        return $this->robotConfig['mp'][0]['loops'] ?? [];
+    }
+
+    function getHandlerNames(): array
+    {
+        return $this->robotConfig['mp'][0]['handlers'] ?? [];
     }
 
     function getPrefixes(): string
@@ -267,6 +283,25 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
     }
 
+    function getHandlers(): array
+    {
+        return $this->handlers;
+    }
+    function getLoops(): array
+    {
+        return $this->loops;
+    }
+
+    public function getLoopState(string $loopName): bool
+    {
+        $state = $this->__get('loop_state');
+        return $state ?? false;
+    }
+    public function setLoopState(string $loopName, bool $loopState): void
+    {
+        $this->__set('loop_state', $loopState);
+    }
+
     public function getSessionCreation(): \Generator // float
     {
         $filepath = CREATION_FILE;
@@ -281,15 +316,15 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $microTime;
     }
 
-    private function possiblyVerb(array $update, string $prefixes = '!/', int $maxlen = 20): string
+    public static function possiblyVerb(array $update, string $prefixes, int $maxlen = 30): string
     {
         if ($update['_'] === 'updateNewMessage' && isset($update['message']['message'])) {
             $msg = $update['message']['message'];
             if (strlen($msg) >= 2 && strpos($prefixes, $msg[0]) !== false) {
                 $spaceloc = strpos($msg, ' ');
-                $verb = !$spaceloc ? substr($msg, 1) : substr($msg, 1, $spaceloc);
+                $verb = $spaceloc === false ? substr($msg, 1) : substr($msg, 1, $spaceloc - 1);
                 if (strlen($verb) < $maxlen && ctype_alnum(str_replace('_', '', $verb))) {
-                    return $verb;
+                    return strtolower($verb);
                 }
             }
         }

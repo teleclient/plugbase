@@ -6,26 +6,32 @@ use danog\MadelineProto\Logger;
 
 class BuiltinLoop extends AbstractLoop implements Loop
 {
-    protected function pluggedLoop(): \Generator
+    public function onStart(): \Generator
     {
-        $eh  = $this->eh->getEventHandler();
-        $now =  $this->userDate->format();
-        $msg = "{$this}: Time is $now!";
-        yield $eh->logger($msg, Logger::ERROR);
-        if (false) {
-            yield $eh->account->updateProfile([
-                'about' => $now
-            ]);
+        yield $this->logger("Builtin Lopp onStart invoked!", Logger::ERROR);
+    }
+
+    protected function pluggedLoop(bool $state): \Generator
+    {
+        if ($state) {
+            if (false) {
+                yield $this->eh->account->updateProfile([
+                    'about' => $this->userDate->format()
+                ]);
+            }
+            if (true) {
+                $robotId = $this->eh->getRobotID();
+                yield $this->eh->messages->sendMessage([
+                    'peer'    => $this->eh->getRobotID(),
+                    'message' => "{$this} loop plugin: Time is " . $this->userDate->format() . "!"
+                ]);
+            }
         }
-        if (true) {
-            $robotId = $eh->getRobotID();
-            yield $eh->messages->sendMessage([
-                'peer'    => $robotId,
-                'message' => $msg
-            ]);
+        yield $this->eh->sleep(1);
+        $delay = $this->secondsToNexMinute();
+        if ($state) {
+            $this->logger("The {$this} loop plugin's next invocation is in $delay seconds!", Logger::ERROR);
         }
-        yield $eh->sleep(1);
-        $delay = \secondsToNexMinute();
         return $delay; // Repeat at the very begining of the next minute, sharp.
     }
 }

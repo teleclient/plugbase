@@ -16,7 +16,7 @@ class YourLoop extends AbstractLoop implements Loop
         yield;
     }
 
-    protected function pluggedLoop(): \Generator
+    protected function pluggedLoop(bool $state): \Generator
     {
         return;
         yield;
