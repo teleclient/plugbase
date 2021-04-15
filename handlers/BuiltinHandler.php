@@ -95,6 +95,15 @@ class BuiltinHandler extends AbstractHandler implements Handler
                     $eh->logger('Self-Restarter disabled.', Logger::ERROR);
                 }
                 yield $eh->stop();
+                $session = $eh->getSessionName();
+                if (file_exists($session)) {
+                    unlink($session);
+                    $eh->logger("Session file $session is deleted!", Logger::ERROR);
+                }
+                if (file_exists($session . '.lock')) {
+                    unlink($session . '.lock');
+                    $eh->logger("Session lock file $session.lock is deleted!", Logger::ERROR);
+                }
                 return true;
             }
         }
@@ -164,7 +173,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $status  = '<b>STATUS:</b>  (Script: ' . SCRIPT_INFO . ')<br>';
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
-                $status .= "Robot's User-Id: $robotId<br>";
+                $status .= "Robot's User-Id: " . $eh->getRobotId() . "<br>";
                 $status .= "Session Age: "              . \UserDate::duration($sessionCreation,               $now) . "<br>";
                 $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),        $now) . "<br>";
                 $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),   $now) . "<br>";
@@ -344,8 +353,8 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $eh->setStopReason('restart');
                 break;
             case 'logout':
-                $eh->logger(self::RESTARTING_MSG, Logger::ERROR);
-                yield respond($eh, $peer, $msgId, self::RESTARTING_MSG);
+                $eh->logger(self::LOGGINGOUT_MSG, Logger::ERROR);
+                yield respond($eh, $peer, $msgId, self::LOGGINGOUT_MSG);
                 $eh->setStopReason('logout');
                 break;
             case 'stop':

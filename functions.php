@@ -307,7 +307,7 @@ function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = nu
         'pause_min'   => $pauseMin,
         'pause_max'   => $pauseMax
     ]);
-    yield $mp->logger($json, \danog\MadelineProto\Logger::ERROR);
+    $mp->logger($json, \danog\MadelineProto\Logger::ERROR);
     $limit = min($limit, $maxDialogs);
     $params = [
         'offset_date' => 0,
@@ -342,7 +342,7 @@ function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = nu
         $fetchedSofar = $fetched + $sliceSize;
         $countMsg     = "Result: {dialogs:$sliceSize, messages:$messageCount, chats:$chatCount, users:$userCount " .
             "total:$totalDialogs fetched:$fetchedSofar}";
-        yield $mp->logger($countMsg, Logger::ERROR);
+        $mp->logger($countMsg, Logger::ERROR);
         if (count($res['messages']) !== $sliceSize) {
             throw new Exception('Unequal slice size.');
         }
@@ -413,21 +413,18 @@ function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = nu
             $params['count']       = $sliceSize;
         } else {
             yield $mp->echo('*** NO LAST-DATE EXISTED' . PHP_EOL);
-            yield $mp->logger('*** All ' . $totalDialogs . ' Dialogs fetched. EXITING ...', Logger::ERROR);
+            $mp->logger('*** All ' . $totalDialogs . ' Dialogs fetched. EXITING ...', Logger::ERROR);
             break;
         }
         if (!isset($res['count'])) {
-            yield $mp->echo('*** All ' . $totalDialogs . ' Dialogs fetched. EXITING ...' . PHP_EOL);
-            yield $mp->logger('*** All ' . $totalDialogs . ' Dialogs fetched. EXITING ...', Logger::ERROR);
+            $mp->logger('*** All ' . $totalDialogs . ' Dialogs fetched. EXITING ...', Logger::ERROR);
             break;
         }
         if ($pauseMin > 0 || $pauseMax > 0) {
             $pause = $pauseMax <= $pauseMin ? $pauseMin : rand($pauseMin, $pauseMax);
-            //yield $mp->logger("Pausing for $pause seconds. ...", Logger::ERROR);
-            //yield $mp->logger(" ", Logger::ERROR);
             yield $mp->sleep($pause);
         } else {
-            //yield $mp->logger(" ", Logger::ERROR);
+            //$mp->logger(" ", Logger::ERROR);
         }
     } // end of while/for
 }
