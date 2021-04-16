@@ -18,7 +18,7 @@ $phar = new Phar($buildRoot . $pharFile, 0, $pharFile);
 
 $phar["index.php"]            = file_get_contents($srcRoot . "index.php");
 $phar["BaseEventHandler.php"] = file_get_contents($srcRoot . "BaseEventHandler.php");
-$phar["handler.php"]          = file_get_contents($srcRoot . "Handler.php");
+$phar["Handler.php"]          = file_get_contents($srcRoot . "Handler.php");
 $phar["AbstractHandler.php"]  = file_get_contents($srcRoot . "AbstractHandler.php");
 $phar["Loop.php"]             = file_get_contents($srcRoot . "Loop.php");
 $phar["AbstractLoop.php"]     = file_get_contents($srcRoot . "AbstractLoop.php");

@@ -214,7 +214,7 @@ if ($authState === 4) {
 $hasAllAuth = $authState === -2 ? false : $mp->hasAllAuth();
 Logger::log("Is Authorized: " . ($hasAllAuth ? 'true' : 'false'), Logger::ERROR);
 if ($authState === MTProto::LOGGED_IN && !$hasAllAuth) {
-    echo (PHP_EOL . "The Session is terminated or corrupted!<br>" . PHP_EOL . PHP_EOL);
+    //echo (PHP_EOL . "The Session is terminated or corrupted!<br>" . PHP_EOL . PHP_EOL);
     Logger::log("The Session is terminated or corrupted!", Logger::ERROR);
 }
 

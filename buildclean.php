@@ -5,16 +5,12 @@ declare(strict_types=1);
 $srcRoot   = "";
 $buildRoot = "build/";
 
-deltree($builRoot);
-mkdir($builRoot);
-
-if (!file_exists('build')) {
-    mkdir('build');
-}
+deltree($buildRoot);
+mkdir($buildRoot);
 
 copy($srcRoot . "index.php",            $buildRoot . "index.php");
 copy($srcRoot . "BaseEventHandler.php", $buildRoot . "BaseEventHandler.php");
-copy($srcRoot . "handler.php",          $buildRoot . "Handler.php");
+copy($srcRoot . "Handler.php",          $buildRoot . "Handler.php");
 copy($srcRoot . "AbstractHandler.php",  $buildRoot . "AbstractHandler.php");
 copy($srcRoot . "Loop.php",             $buildRoot . "Loop.php");
 copy($srcRoot . "AbstractLoop.php",     $buildRoot . "AbstractLoop.php");
@@ -42,11 +38,13 @@ copy($srcRoot . "loops/YourLoop.php",    $buildRoot . "loops.sample/YourLoop.php
 echo "$buildRoot successfully created" . PHP_EOL;
 
 
-function delTree($dir)
+function delTree(string $dir)
 {
-    $files = array_diff(scandir($dir), array('.', '..'));
-    foreach ($files as $file) {
-        (is_dir("$dir/$file")) ? delTree("$dir/$file") : unlink("$dir/$file");
+    if (file_exists($dir)) {
+        $files = array_diff(scandir($dir), array('.', '..'));
+        foreach ($files as $file) {
+            (is_dir("$dir/$file")) ? delTree("$dir/$file") : unlink("$dir/$file");
+        }
+        return rmdir($dir);
     }
-    return rmdir($dir);
 }
