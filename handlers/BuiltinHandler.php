@@ -17,9 +17,15 @@ class BuiltinHandler extends AbstractHandler implements Handler
     function __construct(BaseEventHandler $eh)
     {
         parent::__construct($eh);
-
+        Logger::log("Constructing BuiltinHandler!", Logger::ERROR);
         $this->eh = $eh;
         $this->totalUpdates = 0;
+    }
+
+    public function __destruct()
+    {
+        Logger::log("Destructing BuiltinHandler!", Logger::ERROR);
+        parent::__destruct();
     }
 
     public function onStart(BaseEventHandler $eh): \Generator
@@ -77,6 +83,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 }
                 $eh->logger('Robot stopped at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->stop();
+                $eh->setStopReason('stop');
                 return true;
             }
 
@@ -84,26 +91,19 @@ class BuiltinHandler extends AbstractHandler implements Handler
             if ($vars['msgText'] === self::RESTARTING_MSG) {
                 $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->restart();
+                $eh->setStopReason('restart');
                 return true;
             }
 
             //Function: Finnish executing the Logout command.
             if ($vars['msgText'] === self::LOGGINGOUT_MSG) {
                 $eh->logger('Robot logged out at ' . $eh->formatTime() . '!', Logger::ERROR);
-                yield $eh->logout();
                 if (Shutdown::removeCallback('restarter')) {
                     $eh->logger('Self-Restarter disabled.', Logger::ERROR);
                 }
+                yield $eh->logout();
                 yield $eh->stop();
-                $session = $eh->getSessionName();
-                if (file_exists($session)) {
-                    unlink($session);
-                    $eh->logger("Session file $session is deleted!", Logger::ERROR);
-                }
-                if (file_exists($session . '.lock')) {
-                    unlink($session . '.lock');
-                    $eh->logger("Session lock file $session.lock is deleted!", Logger::ERROR);
-                }
+                $eh->setStopReason('logout');
                 return true;
             }
         }
@@ -268,8 +268,8 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $param1 = strtolower($params[0] ?? '');
                 $paramsCount = count($params);
                 if (
-                    ($param1  !== 'on'  && $param1 !== 'off' && $param1 !== 'state') ||
-                    ($param1  === 'on'  && $paramsCount !== 1 && $paramsCount !== 2) ||
+                    ($param1  !== 'on'  && $param1 !== 'off'  && $param1 !== 'state') ||
+                    ($param1  === 'on'  && $paramsCount !== 1 && $paramsCount !== 2)  ||
                     ($param1  === 'on'  && $paramsCount === 2 && !ctype_digit($params['1'])) ||
                     (($param1 === 'off' || $param1 === 'state') && $paramsCount !== 1)
                 ) {
@@ -360,7 +360,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
             case 'stop':
                 $eh->logger(self::STOPPING_MSG, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, self::STOPPING_MSG);
-                $eh->setStopReason($verb);
+                $eh->setStopReason('stop');
                 break;
             default:
                 $text = "Invalid command: '$msgText'";

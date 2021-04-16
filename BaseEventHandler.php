@@ -64,6 +64,9 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         Logger::log('EventHandler initialized at ' . $this->userDate->format($now), Logger::ERROR);
 
+        //$e = new \Exception; // for debugging only
+        //Logger::log($e->getTraceAsString(), Logger::ERROR);
+
         $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
 
         $handlerNames   = $this->getHandlerNames();
@@ -79,6 +82,28 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
             Logger::log("Handler Plugin '$created' created!", Logger::ERROR);
             $this->handlers[$handlerName] = $newClass;
         }
+    }
+
+    public function __destruct()
+    {
+        $eh = $this;
+        $reason  = $eh->getStopReason();
+        $session = $eh->getSessionName();
+        if ($reason === 'logout') {
+            if (file_exists($session)) {
+                unlink($session);
+                Logger::log("Session file $session is deleted!", Logger::ERROR);
+            }
+            if (file_exists($session . '.lock')) {
+                unlink($session . '.lock');
+                Logger::log("Session lock file $session.lock is deleted!", Logger::ERROR);
+            }
+            if (file_exists($session . '.script.lock')) {
+                unlink($session . '.lock');
+                Logger::log("Session lock file $session.lock is deleted!", Logger::ERROR);
+            }
+        }
+        Logger::log("Destructing BaseEventHandler! Session:'$session'  Reason:'$reason'", Logger::ERROR);
     }
 
     public function onStart(): \Generator

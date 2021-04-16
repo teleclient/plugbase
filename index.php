@@ -12,8 +12,9 @@ use function Amp\File\{get, put, exists, getSize, touch};
 
 define("SCRIPT_START_TIME", \microtime(true));
 define('SCRIPT_INFO',       'BASE_PLG V1.1.1'); // <== Do not change!
-$clean  = false;
-$signal = null; // DON NOT DELETE
+$clean      = false;
+$signal     = null; // DON NOT DELETE
+$stopReason = null;
 
 require_once 'functions.php';
 initPhp();
@@ -153,7 +154,7 @@ if ($newSession) {
 \error_clear_last();
 
 Shutdown::addCallback(
-    function () use ($mp, &$signal, $userDate, &$clean) {
+    function () use ($mp, &$signal, $userDate, &$clean, &$stopReason) {
         $scriptEndTime = \microTime(true);
         //$e = new \Exception;
         //Logger::log($e->getTraceAsString(), Logger::ERROR);
@@ -196,7 +197,7 @@ Shutdown::addCallback(
         Logger::log("Shutting down due to '$stopReason' ....", Logger::ERROR);
         $record = \Launch::finalizeLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, $scriptEndTime, $stopReason);
         $record = \Launch::floatToDate($record, $userDate);
-        Logger::log("Final Update Run Record: " . toJSON($record, false), Logger::ERROR);
+        Logger::log("Final Update Run Record: " . toJSON($record, true), Logger::ERROR);
         $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
         $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!";
         Logger::log($msg, Logger::ERROR);
@@ -237,8 +238,8 @@ function exceptionErrorHandler($errno = 0, $errstr = null, $errfile = null, $err
     ) {
         return false;
     }
-    echo ("errno: $errstr" . PHP_EOL);
-    echo ("errstr: '$errstr??'''" . PHP_EOL);
+    echo ("errno: $errstr"          . PHP_EOL);
+    echo ("errstr: '$errstr??'''"   . PHP_EOL);
     echo ("errfile: '$errfile??'''" . PHP_EOL);
     echo ("errline: '$errline??'''" . PHP_EOL);
     throw new \danog\MadelineProto\Exception($errstr, $errno, null, $errfile, $errline);

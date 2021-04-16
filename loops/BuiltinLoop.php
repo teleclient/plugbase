@@ -34,4 +34,9 @@ class BuiltinLoop extends AbstractLoop implements Loop
         }
         return $delay; // Repeat at the very begining of the next minute, sharp.
     }
+
+    public function __destruct()
+    {
+        Logger::log("Destructing BuiltinLoop!", Logger::ERROR);
+    }
 }

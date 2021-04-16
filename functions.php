@@ -6,7 +6,6 @@ use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
 use danog\madelineproto\MTProto;
-use \danog\Loop\Generic\GenericLoop;
 use function Amp\File\{get, put, exists, getSize};
 
 function toJSON($var, bool $pretty = true): ?string
@@ -748,11 +747,11 @@ function myStartAndLoop(API $MadelineProto, string $eventHandler, array $genLoop
     };
 }
 
-function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): void
+function safeStartAndLoop(API $mp, string $eventHandler): void
 {
     $mp->async(true);
     //$mp->__set('config', $robotConfig);
-    $mp->loop(function () use ($mp, $eventHandler, $genLoops) {
+    $mp->loop(function () use ($mp, $eventHandler) {
         $errors = [];
         while (true) {
             try {
@@ -777,15 +776,22 @@ function safeStartAndLoop(API $mp, string $eventHandler, array $genLoops = []): 
                 }
                 \closeConnection('Bot was started!');
 
-                yield $mp->setEventHandler($eventHandler);
+                if (!$mp->hasEventHandler()) {
+                    yield $mp->setEventHandler($eventHandler);
+                    yield $mp->logger("EventHandler is set!", Logger::ERROR);
+                } else {
+                    yield $mp->setEventHandler($eventHandler); // For now.  To be investigated
+                    yield $mp->logger("EventHandler was already set!", Logger::ERROR);
+                }
+
                 if (\method_exists($eventHandler, 'finalizeStart')) {
                     $eh = $mp->getEventHandler($eventHandler);
                     yield $eh->finalizeStart($mp);
                 }
 
-                foreach ($genLoops as $genLoop) {
-                    $genLoop->start(); // Do NOT use yield.
-                }
+                //foreach ($genLoops as $genLoop) {
+                //    $genLoop->start(); // Do NOT use yield.
+                //}
                 $started = true;
                 \danog\madelineproto\Tools::wait(yield from $mp->API->loop());
                 break;
