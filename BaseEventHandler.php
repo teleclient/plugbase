@@ -89,16 +89,6 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $eh = $this;
         $reason  = $eh->getStopReason();
         $session = __DIR__ . '/' . $eh->getSessionName();
-
-        if (file_exists($session)) {
-            Logger::log("Session file $session exists!", Logger::ERROR);
-        }
-        if (file_exists($session . '.lock')) {
-            Logger::log("Session lock file $session.lock exists!", Logger::ERROR);
-        }
-        if (file_exists($session . '.script.lock')) {
-            Logger::log("Session lock file $session.lock exists!", Logger::ERROR);
-        }
         if ($reason === 'logout') {
             if (file_exists($session)) {
                 unlink($session);
@@ -109,8 +99,8 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
                 Logger::log("Session lock file $session.lock is deleted!", Logger::ERROR);
             }
             if (file_exists($session . '.script.lock')) {
-                unlink($session . '.lock');
-                Logger::log("Session lock file $session.lock is deleted!", Logger::ERROR);
+                unlink($session . '.script.lock');
+                Logger::log("Session lock file $session.script.lock is deleted!", Logger::ERROR);
             }
         }
         Logger::log("Destructing BaseEventHandler! Reason:'$reason'  Session:'$session'", Logger::ERROR);
