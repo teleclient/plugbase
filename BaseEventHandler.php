@@ -317,6 +317,15 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->loops;
     }
 
+    function getHandler(string $name): object
+    {
+        return $this->handlers[$name];
+    }
+    function getLoop(string $name): object
+    {
+        return $this->loops[$name];
+    }
+
     public function getLoopState(string $loopName): bool
     {
         $state = $this->__get('loop_state');

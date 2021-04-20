@@ -14,10 +14,8 @@ return [
             'session'      => 'madeline.madeline',
             'filterlog'    => false,
             'notification' => 'off',
-            'phone'    => '+14328364939',
-            'password' => '',
-            'handlers' => ['BuiltinHandler', 'YourHandler'],
-            'loops'    => ['BuiltinLoop',    'YourLoop'],
+            'handlers' => ['Builtin', 'Your'],
+            'loops'    => ['Builtin', 'Your'],
             'settings' => [
                 'app_info' => [
                     'app_version' => SCRIPT_INFO,                     // <== Do not change!
