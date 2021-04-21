@@ -16,15 +16,20 @@ $clean      = false;
 $signal     = null; // DON NOT DELETE
 $stopReason = null;
 
-require_once 'functions.php';
+require_once 'utils/functions.php';
 initPhp();
-includeMadeline('phar', '5.1.34');
-
-require_once 'UserDate.php';
-require_once 'FilteredLogger.php';
-require_once 'Launch.php';
+//includeMadeline('phar', '5.1.34');
+includeMadeline('composer');
+require_once 'utils/UserDate.php';
+require_once 'utils/FilteredLogger.php';
+require_once 'utils/Launch.php';
 require_once 'BaseEventHandler.php';
 
+if (!file_exists('config.php')) {
+    echo ("Fatal Error: The file config.php is missing!" . PHP_EOL);
+    echo ("Rename the config.sample.php file to config.php and modify it based on your needs!" . PHP_EOL);
+    die();
+}
 $robotConfig = include('config.php');
 includeHandlers($robotConfig);
 includeLoops($robotConfig);

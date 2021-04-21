@@ -299,7 +299,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                     $paramsCount === 2 && $action !== 'on' && $action !== 'off' && $action !== 'state' ||
                     $paramsCount === 1 && $action !== 'on' && $action !== 'off' && $action !== ''
                 ) {
-                    $text = "The loop action must be one of 'pause', 'resume', or 'state'.";
+                    $text = "The loop action must be one of 'pause', 'on', or 'off'.";
                     $eh->logger($text, Logger::ERROR);
                     yield respond($eh, $peer, $msgId, $text);
                     break;

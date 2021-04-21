@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-//namespace danog\MadelineProto\Loop\Generic;
-
 use danog\MadelineProto\API;
-use danog\MadelineProto\Generic\GenericLoop;
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Loop\Impl\ResumableSignalLoop;
 
