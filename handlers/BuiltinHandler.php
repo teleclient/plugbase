@@ -24,7 +24,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
 
     public function __destruct()
     {
-        Logger::log("Destructing BuiltinHandler!", Logger::ERROR);
+        Logger::log("Destructing the 'builtin' loop handler!", Logger::ERROR);
         parent::__destruct();
     }
 
@@ -84,6 +84,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $eh->logger('Robot stopped at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->stop();
                 $eh->setStopReason('stop');
+                $eh->destroyLoops();
                 return true;
             }
 
@@ -92,6 +93,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->restart();
                 $eh->setStopReason('restart');
+                $eh->destroyLoops();
                 return true;
             }
 
@@ -104,6 +106,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 yield $eh->logout();
                 yield $eh->stop();
                 $eh->setStopReason('logout');
+                $eh->destroyLoops();
                 return true;
             }
         }
@@ -311,32 +314,15 @@ class BuiltinHandler extends AbstractHandler implements Handler
                     yield respond($eh, $peer, $msgId, $text);
                     break;
                 }
-                if (false) {
-                    if ($action === 'off') {
-                        yield $loopObj->pause();
-                        $text = "The $loopname loop plugin pauseed!";
-                        yield respond($eh, $peer, $msgId, $text);
-                        $eh->logger($text, Logger::ERROR);
-                    } elseif ($action === 'on') {
-                        yield $loopObj->resume();
-                        $text = "The $loopname loop plugin resumed!";
-                        yield respond($eh, $peer, $msgId, $text);
-                        $eh->logger($text, Logger::ERROR);
-                    } elseif ($action === 'state') {
-                        $text = "The command  '/loop $loopname state' received!";
-                        yield respond($eh, $peer, $msgId, $text);
-                        $eh->logger($text, Logger::ERROR);
-                    }
-                }
                 $loopStatePrev = $eh->getLoopState($loopname);
-                $loopState     = $action === 'on' ? true : ($action === 'off' ? false : $loopStatePrev);
-                $text = "The $loopname loop plugin state is " . ($loopState ? 'ON' : 'OFF') . '!';
+                $loopState     = $action === 'on' ? 'on' : ($action === 'off' ? 'off' : $loopStatePrev);
+                $text = "The $loopname loop plugin state is " . ($loopState === 'on' ? 'ON' : 'OFF') . '!';
                 $eh->logger($text, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, $text);
                 if ($loopState !== $loopStatePrev) {
                     $eh->setLoopState($loopname, $loopState);
                 }
-                if ($loopStatePrev === false && $loopState === true) {
+                if ($loopStatePrev === 'off' && $loopState === 'on') {
                     //$loopObj->resume();
                 }
                 $eh->logger("The command '$msgText' successfully executed!", Logger::ERROR);
@@ -377,7 +363,9 @@ class BuiltinHandler extends AbstractHandler implements Handler
     }
     public function setNotif(string $notification): void
     {
-        if ($notification === '') throw new ErrorException("Invalid parameters: '$notification'");
+        if ($notification === '') {
+            throw new ErrorException("Invalid parameters: '$notification'");
+        }
         $this->eh->__set('notification', $notification);
     }
 }

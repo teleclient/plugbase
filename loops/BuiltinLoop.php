@@ -11,15 +11,18 @@ class BuiltinLoop extends AbstractLoop implements Loop
         yield $this->logger("Builtin Lopp onStart invoked!", Logger::ERROR);
     }
 
-    protected function pluggedLoop(bool $state): \Generator
+    protected function pluggedLoop(string $loopState): \Generator
     {
-        if ($state) {
+        if ($loopState === 'on') {
+            if (true) {
+                $this->logger("The '{$this}' loop plugin: Time is " . $this->userDate->format() . "!", Logger::ERROR);
+            }
             if (false) {
                 yield $this->eh->account->updateProfile([
                     'about' => $this->userDate->format()
                 ]);
             }
-            if (true) {
+            if (false) {
                 $robotId = $this->eh->getRobotID();
                 yield $this->eh->messages->sendMessage([
                     'peer'    => $this->eh->getRobotID(),
@@ -29,14 +32,15 @@ class BuiltinLoop extends AbstractLoop implements Loop
         }
         yield $this->eh->sleep(1);
         $delay = $this->secondsToNexMinute();
-        if ($state) {
-            $this->logger("The {$this} loop plugin's next invocation is in $delay seconds!", Logger::ERROR);
+        if ($loopState === 'on') {
+            $this->logger("The '{$this}' loop plugin's next invocation is in $delay seconds!", Logger::ERROR);
         }
         return $delay; // Repeat at the very begining of the next minute, sharp.
     }
 
     public function __destruct()
     {
-        Logger::log("Destructing BuiltinLoop!", Logger::ERROR);
+        Logger::log("Destructing the 'builtin' loop plugin!", Logger::ERROR);
+        parent::__destruct();
     }
 }

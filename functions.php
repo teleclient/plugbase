@@ -842,3 +842,8 @@ function secondsToNexMinute(float $now = null): int
     //echo ("{now: $now, next: $next, diff: $diff, secs: $secs}" . PHP_EOL);
     return $secs > 0 ? $secs : 60;
 }
+
+function madelineMajorVersion(): int
+{
+    return MTProto::V > 137 ? 6 : (MTProto::V > 105 ? 5 : 4);
+}

@@ -11,14 +11,15 @@ use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
 define("SCRIPT_START_TIME", \microtime(true));
-define('SCRIPT_INFO',       'BASE_PLG V1.1.1'); // <== Do not change!
+define('SCRIPT_INFO',       'BASE_PLG V1.1.2'); // <== Do not change!
 $clean      = false;
 $signal     = null; // DON NOT DELETE
 $stopReason = null;
 
 require_once 'functions.php';
 initPhp();
-includeMadeline('phar', '5.1.34');
+//includeMadeline('phar', '5.1.34');
+includeMadeline('composer');
 
 require_once 'UserDate.php';
 require_once 'FilteredLogger.php';
@@ -87,11 +88,11 @@ if (isset($_REQUEST['MadelineSelfRestart'])) {
 $processId = \getmypid() === false ? 0 : \getmypid();
 $sessionLock = null;
 Logger::log("A new Process with pid $processId started at " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock)) {
+if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock, 60)) {
     closeConnection("Bot is already running!");
     removeShutdownHandlers();
     $launch = \Launch::appendBlockedRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'blocked');
-    Logger::log("Another instance of the script terminated at: " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
+    Logger::log("The new instance of the script with pid $processId terminated at: " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
     exit(1);
 }
 
@@ -199,7 +200,7 @@ Shutdown::addCallback(
         $record = \Launch::floatToDate($record, $userDate);
         Logger::log("Final Update Run Record: " . toJSON($record, true), Logger::ERROR);
         $duration = \UserDate::duration(SCRIPT_START_TIME, $scriptEndTime);
-        $msg = SCRIPT_INFO . " stopped due to $stopReason!  Execution duration: " . $duration . "!";
+        $msg = SCRIPT_INFO . " stopped due to '$stopReason'!  Execution duration: " . $duration . "!";
         Logger::log($msg, Logger::ERROR);
     },
     'duration'
@@ -326,8 +327,7 @@ function removeShutdownHandlers(): void
 {
     $class = new ReflectionClass('danog\MadelineProto\Shutdown');
     $callbacks = $class->getStaticPropertyValue('callbacks');
-    Logger::log("Shutdown Callbacks Count: " . count($callbacks), Logger::ERROR);
-
+    //Logger::log("Shutdown Callbacks Count: " . count($callbacks), Logger::ERROR);
     register_shutdown_function(function () {
     });
 }

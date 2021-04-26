@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0f2de20367ffb7c9ad5231d1d89d0f06",
+    "content-hash": "8ad067fa1a0f595e8c6e3643a18350b8",
     "packages": [
         {
             "name": "amphp/amp",
@@ -1226,16 +1226,16 @@
         },
         {
             "name": "danog/ipc",
-            "version": "0.1.7",
+            "version": "0.1.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/danog/ipc.git",
-                "reference": "a44e077f2d7791fd40ab4673cbf065705f81423c"
+                "reference": "be76cf8125edd9248e953a916a619fbe78fc0e1e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/danog/ipc/zipball/a44e077f2d7791fd40ab4673cbf065705f81423c",
-                "reference": "a44e077f2d7791fd40ab4673cbf065705f81423c",
+                "url": "https://api.github.com/repos/danog/ipc/zipball/be76cf8125edd9248e953a916a619fbe78fc0e1e",
+                "reference": "be76cf8125edd9248e953a916a619fbe78fc0e1e",
                 "shasum": ""
             },
             "require": {
@@ -1288,9 +1288,9 @@
             ],
             "support": {
                 "issues": "https://github.com/danog/ipc/issues",
-                "source": "https://github.com/danog/ipc/tree/0.1.7"
+                "source": "https://github.com/danog/ipc/tree/0.1.11"
             },
-            "time": "2021-04-07T09:11:22+00:00"
+            "time": "2021-04-21T13:27:22+00:00"
         },
         {
             "name": "danog/libdns-json",

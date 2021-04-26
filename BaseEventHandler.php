@@ -103,7 +103,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
                 Logger::log("Session lock file $session.script.lock is deleted!", Logger::ERROR);
             }
         }
-        Logger::log("Destructing BaseEventHandler! Reason:'$reason'  Session:'$session'", Logger::ERROR);
+        Logger::log("Destructing the 'BaseEventHandler'! Reason:'$reason'  Session:'$session'", Logger::ERROR);
     }
 
     public function onStart(): \Generator
@@ -134,6 +134,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function finalizeStart(API $mp): \Generator
     {
+        Logger::log("Entering the method BaseEventHandler::finalizeStart!", Logger::ERROR);
         $this->mp = $mp;
         $mpVersion = MTProto::RELEASE . ' (' . MTProto::V . ', ' . Magic::$revision . ')';
         Logger::log("MadelineProto version: '$mpVersion'", Logger::ERROR);
@@ -141,6 +142,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $loopNames = $this->getLoopNames(); // $this->robotConfig['mp'][0]['loops'];
         $this->loops = [];
         foreach ($loopNames as $loopName) {
+            $lowerName = strtolower($loopName);
             $className = $loopName . 'Loop';
             if (!class_exists($className)) {
                 removeShutdownHandlers();
@@ -153,6 +155,17 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
                 throw new ErrorException("Invalid Loop Plugin name: '$className'");
             }
             Logger::log("Loop Plugin '$created' created!", Logger::ERROR);
+
+            $loopState = $this->__get("loopstate_$lowerName");
+            if ($loopState !== 'on' && $loopState !== 'off') {
+                if (method_exists($newClass, 'initialState')) {
+                    $loopState = $newClass->initialState() === 'on' ? 'on' : 'off';
+                } else {
+                    $loopState = 'on';
+                }
+                $this->__set("loopstate_$lowerName", $loopState);
+            }
+
             if (method_exists($newClass, 'onStart')) {
                 Logger::log("Loop plugin '$className' onStart method invoked!", Logger::ERROR);
                 yield $newClass->onStart();
@@ -161,7 +174,10 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
             }
             $newClass->start();
             $this->loops[strtolower($loopName)] = $newClass;
+
+            Logger::log("Loop: lower:'$lowerName', shortname:'$loopName', classname:'$className'", Logger::ERROR);
         }
+        Logger::log("Exiting the method BaseEventHandler::finalizeStart!", Logger::ERROR);
     }
 
     public function onAny(array $update): \Generator
@@ -181,7 +197,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
             $nowDate   = $this->formatTime(\microtime(true));
             $startDate = $this->formatTime($this->getScriptStarted());
             $age = $this->canExecute() ? 'new' : 'old';
-            $this->logger("$age verb:$verb, msg:$msgDate, start:$startDate, now:$nowDate", Logger::ERROR);
+            $this->logger("$age verb:'$verb', msg:$msgDate, start:$startDate, now:$nowDate", Logger::ERROR);
             if ($age === 'new') {
                 //$vars = computeVars($update, $this);
             }
@@ -317,14 +333,25 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->loops;
     }
 
-    public function getLoopState(string $loopName): bool
+    public function getLoopState(string $loopName): string
     {
-        $state = $this->__get('loop_state');
-        return $state ?? false;
+        $loopState = $this->__get("loopstate_$loopName");
+        if ($loopState !== 'on' && $loopState !== 'off') {
+            throw new ErrorException("Unknown state '$loopState' for $loopName loop plugin!");
+        }
+        return $loopState;
     }
-    public function setLoopState(string $loopName, bool $loopState): void
+    public function setLoopState(string $loopName, string $loopState): void
     {
-        $this->__set('loop_state', $loopState);
+        $this->__set("loopstate_$loopName", $loopState);
+    }
+    public function destroyLoops()
+    {
+        foreach ($this->loops as $name => $loop) {
+            $this->logger("The $name loop plugin destroyed!", Logger::ERROR);
+            unset($this->loops[$name]);
+        }
+        gc_collect_cycles();
     }
 
     public function getSessionCreation(): \Generator // float

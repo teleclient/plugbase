@@ -3,21 +3,19 @@
 declare(strict_types=1);
 
 return [
-    'admins'     => [], // Robot Id will authomatically be included
-    //'host'     => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
-    'zone'     => 'Asia/Tehran',
-    'prefixes' => '!/',
-    'edit'     => false,
+    'adminIds'    => [], // Robot Id will authomatically be included
+    //'host'      => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
+    'zone'        => 'Asia/Tehran',
+    'prefixes'    => '!/',
+    'edit'        => false,
     'maxrestarts' => 10,
     'mp'   => [
-        0 => [
+        0  => [
             'session'      => 'madeline.madeline',
             'filterlog'    => false,
             'notification' => 'off',
-            'phone'    => '+14328364939',
-            'password' => '',
-            'handlers' => ['BuiltinHandler', 'YourHandler'],
-            'loops'    => ['BuiltinLoop',    'YourLoop'],
+            'handlers' => ['Builtin', 'My'],
+            'loops'    => ['Builtin', 'My'],
             'settings' => [
                 'app_info' => [
                     'app_version' => SCRIPT_INFO,                     // <== Do not change!
@@ -31,10 +29,10 @@ return [
                     'max_size'     => 100 * 1024 * 1024
                 ],
                 'peer' => [
-                    'full_info_cache_time' => 60,
+                    //'full_info_cache_time' => 60,
                 ],
                 'serialization' => [
-                    'cleanup_before_serialization' => true,
+                    //'cleanup_before_serialization' => true,
                 ],
             ]
         ]

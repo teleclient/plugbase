@@ -24,6 +24,7 @@ trace.txt
 error_log
 junk*
 *.log
+mahyar.log
 
 data/
 config.php
@@ -34,3 +35,5 @@ authser.authkey
 nbproject/
 trace.txt
 nbproject/
+
+MiningHandler.php
