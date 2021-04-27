@@ -21,7 +21,7 @@ copy($srcRoot . "Launch.php",         $buildRoot . "Launch.php");
 copy($srcRoot . "FilteredLogger.php", $buildRoot . "FilteredLogger.php");
 copy($srcRoot . "UserDate.php",       $buildRoot . "UserDate.php");
 
-copy($srcRoot . "config.sample.php", $buildRoot . "config.sample.php");
+copy($srcRoot . "config.sample.php",  $buildRoot . "config.sample.php");
 
 if (!file_exists('build/handlers.sample')) {
     mkdir('build/handlers.sample');
