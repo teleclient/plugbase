@@ -74,7 +74,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
             return false;
         }
 
-        if ($eh->newMessage($update)) {
+        if ($eh->recentMessage($update)) {
 
             //Function: Finnish executing the Stop command.
             if ($vars['msgText'] === self::STOPPING_MSG) {
@@ -140,7 +140,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
             case '':
                 break;
             case 'help':
-                $text = getHelpText($eh->getPrefixes());
+                $text = $eh->getHelpText($eh->getPrefixes());
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;

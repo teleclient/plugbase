@@ -27,13 +27,13 @@ if (!file_exists('build/handlers.sample')) {
     mkdir('build/handlers.sample');
 }
 copy($srcRoot . "handlers/BuiltinHandler.php", $buildRoot . "handlers.sample/BuiltinHandler.php");
-copy($srcRoot . "handlers/YourHandler.php",    $buildRoot . "handlers.sample/YourHandler.php");
+copy($srcRoot . "handlers/MyHandler.php",      $buildRoot . "handlers.sample/MyHandler.php");
 
 if (!file_exists('build/loops.sample')) {
     mkdir('build/loops.sample');
 }
 copy($srcRoot . "loops/BuiltinLoop.php", $buildRoot . "loops.sample/BuiltinLoop.php");
-copy($srcRoot . "loops/YourLoop.php",    $buildRoot . "loops.sample/YourLoop.php");
+copy($srcRoot . "loops/MyLoop.php",      $buildRoot . "loops.sample/MyLoop.php");
 
 echo "$buildRoot successfully created" . PHP_EOL;
 

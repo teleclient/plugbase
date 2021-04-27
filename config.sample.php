@@ -19,8 +19,8 @@ return [
             'settings' => [
                 'app_info' => [
                     'app_version' => SCRIPT_INFO,                     // <== Do not change!
-                    'api_id'   => 6,                                  // <== Use your own, or let MadelineProto ask you.
-                    'api_hash' => "eb06d4abfb49dc3eeb1aeb98ae0f581e", // <== Use your own, or let MadelineProto ask you.
+                    //'api_id'   => 6,                                  // <== Use your own, or let MadelineProto ask you.
+                    //'api_hash' => "eb06d4abfb49dc3eeb1aeb98ae0f581e", // <== Use your own, or let MadelineProto ask you.
                 ],
                 'logger' => [
                     'logger'       => \danog\MadelineProto\Logger::FILE_LOGGER,
@@ -38,29 +38,3 @@ return [
         ]
     ]
 ];
-
-function getHelpText(string $prefixes): string
-{
-    $text = '' .
-        '<b>Robot Instructions:</b><br>' .
-        '<br>' .
-        '>> <b>/help</b><br>' .
-        '   To print the robot commands<br>' .
-        '>> <b>/status</b><br>' .
-        '   To query the status of the robot.<br>' .
-        '>> <b>/stats</b><br>' .
-        '   To query the statistics of the robot.<br>' .
-        '>> <b>/notif OFF / ON 20</b><br>' .
-        '   No event notification or notify every 20 secs.<br>' .
-        '>> <b>/crash</b><br>' .
-        '   To generate an exception for testing.<br>' .
-        '>> <b>/restart</b><br>' .
-        '   To restart the robot.<br>' .
-        '>> <b>/stop</b><br>' .
-        '   To stop the script.<br>' .
-        '>> <b>/logout</b><br>' .
-        '   To terminate the robot\'s session.<br>' .
-        '<br>' .
-        '<b>**Valid prefixes are / and !</b><br>';
-    return $text;
-}

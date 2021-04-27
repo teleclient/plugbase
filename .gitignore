@@ -28,6 +28,7 @@ mahyar.log
 
 data/
 config.php
+helpText.php
 authser.authkey
 
 .vscode/

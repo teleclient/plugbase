@@ -184,10 +184,10 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         $verb = $this->possiblyVerb($update, $this->getPrefixes(), 30);
         //$msgFront = substr($update['message']['message'] ?? '', 0, 30);
-        //$this->logger("PossibleVerb: '$verb', newMessage: " . ($this->newMessage($update) ? 'yes' : 'no') . "  msgType: {$update['_']}  msg: '$msgFront'", Logger::ERROR);
+        //$this->logger("PossibleVerb: '$verb', recentMessage: " . ($this->recentMessage($update) ? 'yes' : 'no') . "  msgType: {$update['_']}  msg: '$msgFront'", Logger::ERROR);
         //$isNew = floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
-        if (!$this->canExecute && $verb !== '' && $this->newMessage($update)) {
-            $this->newMessage($update);
+        if (!$this->canExecute && $verb !== '' && $this->recentMessage($update)) {
+            $this->recentMessage($update);
             $this->canExecute = true;
             $this->logger('Command-Processing engine started at ' . $this->formatTime(), Logger::ERROR);
         }
@@ -319,7 +319,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return \basename($this->session);
     }
 
-    function newMessage(array $update): bool
+    function recemtUpdate(array $update): bool
     {
         return floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
     }
@@ -381,5 +381,35 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
             }
         }
         return '';
+    }
+
+    public function getHelpText(string $prefixes = '!/'): string
+    {
+        if (file_exists('data/help.txt')) {
+            $text = \file_get_contents('data/help.txt');
+        } else {
+            $text = '' .
+                '<b>Robot Instructions:</b><br>' .
+                '<br>' .
+                '>> <b>/help</b><br>' .
+                '   To print the robot commands<br>' .
+                '>> <b>/status</b><br>' .
+                '   To query the status of the robot.<br>' .
+                '>> <b>/stats</b><br>' .
+                '   To query the statistics of the robot.<br>' .
+                '>> <b>/notif OFF / ON 20</b><br>' .
+                '   No event notification or notify every 20 secs.<br>' .
+                '>> <b>/crash</b><br>' .
+                '   To generate an exception for testing.<br>' .
+                '>> <b>/restart</b><br>' .
+                '   To restart the robot.<br>' .
+                '>> <b>/stop</b><br>' .
+                '   To stop the script.<br>' .
+                '>> <b>/logout</b><br>' .
+                '   To terminate the robot\'s session.<br>' .
+                '<br>' .
+                '<b>**Valid prefixes are / and !</b><br>';
+        }
+        return $text;
     }
 }
