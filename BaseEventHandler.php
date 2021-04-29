@@ -30,6 +30,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     private bool     $canExecute;
     private string   $stopReason;
     private string   $prefixes;
+    private bool     $notAuthorized;
 
     function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
@@ -63,10 +64,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     private function initBaseEventHandler(float $now)
     {
         Logger::log('EventHandler initialized at ' . $this->userDate->format($now), Logger::ERROR);
-
-        //$e = new \Exception; // for debugging only
-        //Logger::log($e->getTraceAsString(), Logger::ERROR);
-
+        $this->notAuthorized = false;
         $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
 
         $handlerNames   = $this->getHandlerNames();
@@ -134,7 +132,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function finalizeStart(API $mp): \Generator
     {
-        Logger::log("Entering the method BaseEventHandler::finalizeStart!", Logger::ERROR);
+        //Logger::log("Entering the method BaseEventHandler::finalizeStart!", Logger::ERROR);
         $this->mp = $mp;
         $mpVersion = MTProto::RELEASE . ' (' . MTProto::V . ', ' . Magic::$revision . ')';
         Logger::log("MadelineProto version: '$mpVersion'", Logger::ERROR);
@@ -177,7 +175,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
             Logger::log("Loop: lower:'$lowerName', shortname:'$loopName', classname:'$className'", Logger::ERROR);
         }
-        Logger::log("Exiting the method BaseEventHandler::finalizeStart!", Logger::ERROR);
+        //Logger::log("Exiting the method BaseEventHandler::finalizeStart!", Logger::ERROR);
     }
 
     public function onAny(array $update): \Generator
@@ -207,6 +205,17 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         foreach ($this->handlers as $handlerName => $handler) {
             $processed = yield ($handler($update, $vars, $this));
         }
+    }
+
+    public function notAuthorized(): Generator
+    {
+        $this->notAuthorized = true;
+        return;
+        yield;
+    }
+    public function isAuthorized(): bool
+    {
+        return $this->notAuthorized;
     }
 
     public function getRobotConfig(): array

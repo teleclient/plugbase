@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use danog\MadelineProto\API;
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
 
 class FilteredLogger
 {
+    private API    $mp;
     private Logger $filteredLog;
     private Logger $callbackLog;
 
@@ -42,6 +44,11 @@ class FilteredLogger
         $robotConfig['mp'][$index]['settings']['logger']['logger_level'] = $level;
 
         $this->callbackLog = Logger::getLoggerFromSettings($settings);
+    }
+
+    public function setAPI(API $mp): void
+    {
+        $this->mp = $mp;
     }
 
     public function __invoke($entry, int $level): void
@@ -107,7 +114,9 @@ class FilteredLogger
                     \flush();
                 }
                 exit(0);
-            } elseif (strpos($entry, 'Could not resend ') !== false) {
+            } elseif (strpos($entry, 'Auth key not registered, resetting temporary and permanent auth keys...') !== false) {
+                // Session is logged out or externally terminated
+                $entry = $entry;
             }
         }
         $entry = $this->levelDescr($level) . ": " . $entry;

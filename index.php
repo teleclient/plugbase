@@ -5,42 +5,114 @@ declare(strict_types=1);
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
 use danog\MadelineProto\API;
-use danog\MadelineProto\Magic;
 use danog\MadelineProto\MTProto;
+use danog\MadelineProto\Magic;
 use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
-define("SCRIPT_START_TIME", \microtime(true));
 define('SCRIPT_INFO',       'BASE_PLG V1.1.2'); // <== Do not change!
-$clean      = false;
-$signal     = null; // DON NOT DELETE
-$stopReason = null;
+define("SCRIPT_START_TIME", \microtime(true));
 
-require_once 'functions.php';
+$robotConfig = require('config.php');
+$robotConfig = adjustSettings($robotConfig, SCRIPT_INFO);
+require_once 'utils/functions.php';
 initPhp();
-//includeMadeline('phar', '5.1.34');
-includeMadeline('composer');
-
-require_once 'UserDate.php';
-require_once 'FilteredLogger.php';
-require_once 'Launch.php';
+includeMadeline($robotConfig['source'] ?? 'phar 5.1.34');
+require_once 'utils/UserDate.php';
+require_once 'utils/FilteredLogger.php';
+require_once 'utils/Launch.php';
 require_once 'BaseEventHandler.php';
-
-$robotConfig = include('config.php');
 includeHandlers($robotConfig);
 includeLoops($robotConfig);
 
 $userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
+$clean      = false;
+$signal     = null; // DON NOT DELETE
+$stopReason = null;
+//$newSession = saveNewSessionCreation(string $folder, string $file, float $creationTime);
 
 define("MEMORY_LIMIT", \ini_get('memory_limit'));
 define('REQUEST_URL',  \getRequestURL() ?? '');
 define('USER_AGENT',   \getUserAgent()  ?? '');
 
-$dataFiles = makeDataFiles(dirname(__FILE__) . '/data', ['startups', 'launches', 'creation']);
+$dataFiles = makeDataFiles(dirname(__FILE__) . '/data', ['startups', 'launches']);
+define("DATA_DIRECTORY", $dataFiles['directory']);
 define("STARTUPS_FILE",  $dataFiles['startups']);
 define("LAUNCHES_FILE",  $dataFiles['launches']);
-define("CREATION_FILE",  $dataFiles['creation']);
+//define("CREATION_FILE",  $dataFiles['creation']);
 unset($dataFiles);
+
+$filteredLogger = null;
+Magic::classExists();
+if ($robotConfig['mp'][0]['filterlog'] ?? false) {
+    $filteredLogger = new FilteredLogger($robotConfig, 0);
+} else {
+    $logger = Logger::getLoggerFromSettings($robotConfig['mp'][0]['settings']);
+    \error_clear_last();
+}
+
+$scriptStartStr = $userDate->format(SCRIPT_START_TIME);
+$scriptInfo = SCRIPT_INFO;
+$hostname   = hostname() ?? 'UNDEFINED';
+if (PHP_SAPI !== 'cli') {
+    $link = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+} else {
+    $link = "Terminal on $hostname";
+}
+
+$restartsCount = checkTooManyRestarts(STARTUPS_FILE);
+$maxrestarts   = $robotConfig['maxrestarts'] ?? 10;
+if ($restartsCount > $maxrestarts) {
+    $text = "The script '$scriptStartStr' restarted more than $maxrestarts times within a minute. Permanently shutting down ....";
+    Logger::log($text, Logger::ERROR);
+    echo ($text . PHP_EOL);
+    Logger::log("$scriptInfo on '$hostname' is stopping at $scriptStartStr!", Logger::ERROR);
+    exit(1);
+}
+
+$processId   = \getmypid() === false ? 0 : \getmypid();
+$sessionLock = null;
+$maxAquireRety = 30;
+if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock, $maxAquireRety)) {
+    Logger::log("An instance of the script '" . SCRIPT_INFO . "' with pid $processId started at $scriptStartStr via $link!", Logger::ERROR);
+    closeConnection("An instance of the Bot with script $scriptInfo is already running!");
+    removeShutdownHandlers();
+    $quitTime = $scriptStartStr = $userDate->format(microtime(true));
+    $launch = \Launch::appendBlockedRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'blocked');
+    Logger::log("The instance of the script with pid $processId couldn't acquire the lock after $maxAquireRety seconds, therfore terminated at $quitTime!", Logger::ERROR);
+    exit(1);
+}
+
+Logger::log('', Logger::ERROR);
+Logger::log('=====================================================', Logger::ERROR);
+Logger::log("The script $scriptInfo started at: $scriptStartStr with pid $processId via $link!", Logger::ERROR);
+Logger::log("Configurations: " . toJSON(safeConfig($robotConfig)), Logger::ERROR);
+if (isset($_REQUEST['MadelineSelfRestart'])) {
+    Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
+}
+
+if (PHP_SAPI !== 'cli') {
+    if (!\getWebServerName()) {
+        $configuredHostname = $robotConfig['host'] ?? null;
+        if ($configuredHostname) {
+            \setWebServerName($configuredHostname);
+        } else {
+            $text = "To enable the robot's restart, the config->host must be defined!";
+            echo ($text . PHP_EOL);
+            Logger::log($text, Logger::ERROR);
+        }
+    }
+}
+
+unset($restartCount);
+unset($maxrestarts);
+unset($configuredHostname);
+unset($scriptStartStr);
+
+$launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
+$launch = \Launch::floatToDate($launch, $userDate);
+Logger::log("Appended Run Record: " . toJSON($launch, false), Logger::ERROR);
+unset($launch);
 
 if (\defined('SIGINT')) {
     try {
@@ -63,80 +135,6 @@ if (\defined('SIGINT')) {
     }
 }
 
-Magic::classExists();
-if ($robotConfig['mp'][0]['filterlog'] ?? false) {
-    $filteredLogger = new FilteredLogger($robotConfig, 0);
-} else {
-    $logger = Logger::getLoggerFromSettings($robotConfig['mp'][0]['settings']);
-    \error_clear_last();
-}
-
-$restartsCount = checkTooManyRestarts(STARTUPS_FILE);
-$maxrestarts   = $robotConfig['maxrestarts'] ?? 10;
-if ($restartsCount > $maxrestarts) {
-    $text = 'More than $maxrestarts times restarted within a minute. Permanently shutting down ....';
-    Logger::log($text, Logger::ERROR);
-    Logger::log(SCRIPT_INFO . ' on ' . hostname() . ' is stopping at ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-    echo ($text . PHP_EOL);
-    exit(1);
-}
-
-if (isset($_REQUEST['MadelineSelfRestart'])) {
-    Logger::log("Self-restarted, restart token " . $_REQUEST['MadelineSelfRestart'], Logger::ERROR);
-}
-
-$processId = \getmypid() === false ? 0 : \getmypid();
-$sessionLock = null;
-Logger::log("A new Process with pid $processId started at " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-if (!acquireScriptLock(getSessionName($robotConfig), $sessionLock, 60)) {
-    closeConnection("Bot is already running!");
-    removeShutdownHandlers();
-    $launch = \Launch::appendBlockedRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'blocked');
-    Logger::log("The new instance of the script with pid $processId terminated at: " . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-    exit(1);
-}
-
-$safeConfig = safeConfig($robotConfig);
-Logger::log('', Logger::ERROR);
-Logger::log('=====================================================', Logger::ERROR);
-Logger::log('Script started at: ' . $userDate->format(SCRIPT_START_TIME), Logger::ERROR);
-Logger::log("Configurations: " . toJSON($safeConfig), Logger::ERROR);
-unset($safeConfig);
-
-$launch = \Launch::appendLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME, 'kill');
-$launch = \Launch::floatToDate($launch, $userDate);
-Logger::log("Appended Run Record: " . toJSON($launch, false), Logger::ERROR);
-unset($launch);
-
-if (PHP_SAPI !== 'cli') {
-    if (!\getWebServerName()) {
-        $hostname = $robotConfig['host'] ?? null;
-        if ($hostname) {
-            \setWebServerName($hostname);
-        } else {
-            $text = "To enable the restart, the config->host must be defined!";
-            echo ($text . PHP_EOL);
-            Logger::log($text, Logger::ERROR);
-        }
-    }
-}
-
-if (false && \defined('SIGINT')) {
-    try {
-        Loop::unreference(Loop::onSignal(SIGINT, static function () use (&$signal) {
-            $signal = 'sigint';
-            Logger::log('Got sigint', Logger::FATAL_ERROR);
-            Magic::shutdown(1);
-        }));
-        Loop::unreference(Loop::onSignal(SIGTERM, static function () use (&$signal) {
-            $signal = 'sigterm';
-            Logger::log('Got sigterm', Logger::FATAL_ERROR);
-            Magic::shutdown(1);
-        }));
-    } catch (\Throwable $e) {
-    }
-}
-
 Shutdown::addCallback(
     static function (): void {
         Logger::log('Duration dummy placeholder shutdown routine executed!', Logger::ERROR);
@@ -146,28 +144,34 @@ Shutdown::addCallback(
 
 $session    = getSessionName($robotConfig);
 $settings   = $robotConfig['mp'][0]['settings'] ?? [];
-$newSession = file_exists($session) ? false : true;
+$newSession = !file_exists($session);
 $mp = new API($session, $settings);
-Logger::log($newSession ? 'Creating a new session-file.' : 'Un-serializing an existing sesson-file.');
+Logger::log($newSession ? 'Creating a new session-file.' : 'Unserializing an existing sesson-file.');
 if ($newSession) {
-    saveSessionCreation(CREATION_FILE, SCRIPT_START_TIME);
+    saveNewSessionCreation(DATA_DIRECTORY, 'creation.txt', SCRIPT_START_TIME);
 }
 \error_clear_last();
-
+if ($filteredLogger) {
+    $filteredLogger->setAPI($mp);
+}
+if (!$newSession && $mp->hasAllAuth() || authorizationState($mp) === MTProto::NOT_LOGGED_IN) {
+    Logger::log('The session is logged out of, externally terminated, or its account is deleted!');
+}
 Shutdown::addCallback(
     function () use ($mp, &$signal, $userDate, &$clean, &$stopReason) {
         $scriptEndTime = \microTime(true);
-        //$e = new \Exception;
-        //Logger::log($e->getTraceAsString(), Logger::ERROR);
+
         if ($clean) {
             // Clean Exit
         }
-        $stopReason = 'nullapi';
+
         if ($signal !== null) {
             $stopReason = $signal;
         } elseif (!$mp) {
             // The external API class is not instansiated
             $stopReason = 'nullapi';
+        } elseif ($stopReason !== null) {
+            //
         } elseif (!isset($mp->API)) {
             $stopReason = 'destruct';
         } elseif (!$mp->API->event_handler) {
@@ -206,20 +210,8 @@ Shutdown::addCallback(
     'duration'
 );
 
-$authState = authorizationState($mp);
-Logger::log("Authorization State: " . authorizationStateDesc($authState));
-if ($authState === 4) {
-    echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
-    Logger::log("Invalid App, or the Session is corrupted!", Logger::ERROR);
-}
-$hasAllAuth = $authState === -2 ? false : $mp->hasAllAuth();
-Logger::log("Is Authorized: " . ($hasAllAuth ? 'true' : 'false'), Logger::ERROR);
-if ($authState === MTProto::LOGGED_IN && !$hasAllAuth) {
-    //echo (PHP_EOL . "The Session is terminated or corrupted!<br>" . PHP_EOL . PHP_EOL);
-    Logger::log("The Session is terminated or corrupted!", Logger::ERROR);
-}
-
-safeStartAndLoop($mp, BaseEventHandler::class);
+Logger::log('Before start and loop!');
+safeStartAndLoop($mp, BaseEventHandler::class, $stopReason, $newSession);
 
 \error_clear_last();
 echo ('Bye, bye!<br>' . PHP_EOL);
@@ -295,18 +287,25 @@ function acquireScriptLock(string $sessionName, &$lock, $retryCount = 10): bool
     return $acquired;
 }
 
-function saveSessionCreation(string $file, float $creationTime): void
+function saveNewSessionCreation(string $folder, string $file, float $creationTime): bool
 {
-    $strval = strval(intval(round($creationTime * 1000000)));
-    file_put_contents($file, $strval);
+    $fullName = $folder . '/' . $file;
+    if (file_exists($fullName)) {
+        return false;
+    } else {
+        $strval = strval(intval(round($creationTime * 1000000)));
+        file_put_contents($fullName, $strval);
+        return true;
+    }
 }
 
 function fetchSessionCreation(string $folder, string $file): float
 {
-    $strval = file_get_contents($folder . '/', $file);
+    $strval = file_get_contents($folder . '/' . $file);
     return round(intval($strval) / 1000000);
 }
 
+/*
 function get_absolute_path($path)
 {
     $path = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $path);
@@ -322,12 +321,12 @@ function get_absolute_path($path)
     }
     return implode(DIRECTORY_SEPARATOR, $absolutes);
 }
+*/
 
 function removeShutdownHandlers(): void
 {
     $class = new ReflectionClass('danog\MadelineProto\Shutdown');
     $callbacks = $class->getStaticPropertyValue('callbacks');
-    //Logger::log("Shutdown Callbacks Count: " . count($callbacks), Logger::ERROR);
     register_shutdown_function(function () {
     });
 }
@@ -431,4 +430,10 @@ function closeConnection(string $message = 'OK', int $responseCode = 200): void
     // (CGI, a web server, etc). This attempts to push current output all the way
     // to the browser with a few caveats.
     flush();
+}
+
+function adjustSettings(array $robotConfig, string $scriptInfo): array
+{
+    $replacement = ['mp' => [0 => ['settings' => ['app_info' => ['app_version' => $scriptInfo]]]]];
+    return array_replace_recursive($robotConfig, $replacement);
 }

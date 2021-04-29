@@ -85,8 +85,22 @@ function logit(string $entry, object $api = null, int $level = \danog\madelinepr
     }
 }
 
-function includeMadeline(string $source = 'phar', string $param = null)
+function getRequestURL(): ?string
 {
+    //$_SERVER['REQUEST_URI'] => '/base/?MadelineSelfRestart=1755455420394943907'
+    $url = null;
+    if (PHP_SAPI !== 'cli') {
+        $url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+        $url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+    }
+    return $url;
+}
+
+function includeMadeline(string $spec = 'phar'): void
+{
+    $parts = explode(' ', trim($spec));
+    $source = $parts[0];
+    $param  = $parts[1] ?? null;
     switch ($source) {
         case 'phar':
             if (!\file_exists('madeline.php')) {
@@ -118,10 +132,6 @@ function computeVars(array $update, object $eh): array
     $vars['isOutward'] = $update['message']['out'] ?? false;
 
     $vars['execute']   = $eh->canExecute();
-    //$vars['robotId']   = $eh->getRobotId();
-    //$vars['adminIds']  = $eh->getAdminIds();
-    //$vars['officeId']  = $eh->getOfficeId();
-    //$vars['prefixes']  = $eh->getPrefixes();
 
     $vars['fromRobot'] = $update['message']['out'] ?? false;
     $vars['toRobot']   = $vars['peerType'] === 'peerUser'    && $vars['peer']['user_id']    === $eh->getRobotId();
@@ -140,17 +150,6 @@ function computeVars(array $update, object $eh): array
     }
 
     return $vars;
-}
-
-function getRequestURL(): ?string
-{
-    //$_SERVER['REQUEST_URI'] => '/base/?MadelineSelfRestart=1755455420394943907'
-    $url = null;
-    if (PHP_SAPI !== 'cli') {
-        $url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-        $url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
-    }
-    return $url;
 }
 
 function makeDataDirectory($directory): string
@@ -438,20 +437,20 @@ function authorizationState(object $api): int
 function authorizationStateDesc(int $authorized): string
 {
     switch ($authorized) {
-        case  3:
-            return 'LOGGED_IN';
         case  0:
             return 'NOT_LOGGED_IN';
         case  1:
             return 'WAITING_CODE';
         case  2:
             return 'WAITING_PASSWORD';
-        case -1:
-            return 'WAITING_SIGNUP';
+        case  3:
+            return 'LOGGED_IN';
         case 4:
             return 'INVALID_APP';
         case 5:
             return 'NULL_API_OBJECT';
+        case -1:
+            return 'WAITING_SIGNUP';
         case -2:
             return 'UNINSTANTIATED_MTPROTO';
         default:
@@ -747,29 +746,52 @@ function myStartAndLoop(API $MadelineProto, string $eventHandler, array $genLoop
     };
 }
 
-function safeStartAndLoop(API $mp, string $eventHandler): void
+function safeStartAndLoop(API $mp, string $eventHandler, ?string &$stopReason, bool $newSession): void
 {
     $mp->async(true);
     //$mp->__set('config', $robotConfig);
-    $mp->loop(function () use ($mp, $eventHandler) {
+    $mp->loop(function () use ($mp, $eventHandler, &$stopReason, $newSession) {
         $errors = [];
         while (true) {
             try {
                 $started = false;
-                $stateBefore = authorizationState($mp);
-                if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
-                    yield $mp->logger("Not Logged-in!", Logger::ERROR);
+
+                $authStateBefore = authorizationState($mp);
+                $stateBeforeStr  = authorizationStateDesc($authStateBefore);
+                $hasAllAuth      = $authStateBefore === -2 ? false : $mp->hasAllAuth();  // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
+                $hasAllAuthStr   = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
+                $mp->logger("Authorization state before invoking the start method: '$stateBeforeStr'!  " . $hasAllAuthStr, Logger::ERROR);
+                if (!$mp->hasAllAuth() || authorizationState($mp) !== MTProto::LOGGED_IN) {
+                    $mp->logger("Not Logged-in!", Logger::ERROR);
+                }
+                if ($authStateBefore === 4) {  // 4 => 'INVALID_APP' 
+                    echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
+                    Logger::log("Invalid App, or the Session is corrupted!", Logger::ERROR);
+                }
+                if ($authStateBefore === MTProto::LOGGED_IN && !$hasAllAuth) {
+                    Logger::log("The Session is terminated or corrupted!", Logger::ERROR);
                 }
 
+                $stopReasonSaved = $stopReason;
+                $stopReason = 'authorization';
                 $me = yield $mp->start();
+                $stopReason = $stopReasonSaved;
 
-                $stateAfter = authorizationState($mp);
-                yield $mp->logger("Authorization State: {Before_Start: '$stateBefore', After_Start: '$stateAfter'}", Logger::ERROR);
+                $stateAfter    = authorizationState($mp);
+                $stateAfterStr = authorizationStateDesc($stateAfter);
+                $hasAllAuth = "Has all authorizations: " . ($mp->hasAllAuth() ? "'true'" : "'false'");
+                $mp->logger("Authorization state after invoking the start method is '$stateAfterStr'!" . $hasAllAuth, Logger::ERROR);
                 if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
-                    yield $mp->logger("Unsuccessful Login!", Logger::ERROR);
+                    $mp->logger("Unsuccessful Login!", Logger::ERROR);
                     throw new ErrorException('Unsuccessful Login!');
                 } else {
-                    yield $mp->logger("Robot is currently logged-in!", Logger::ERROR);
+                    if ($newSession) {
+                        $new = saveNewSessionCreation(DATA_DIRECTORY, 'creation.txt', SCRIPT_START_TIME);
+                        if (!$new) {
+                            throw new ErrorException('Session creation logic error');
+                        }
+                    }
+                    $mp->logger("Robot is currently logged-in!", Logger::ERROR);
                 }
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
@@ -789,9 +811,6 @@ function safeStartAndLoop(API $mp, string $eventHandler): void
                     yield $eh->finalizeStart($mp);
                 }
 
-                //foreach ($genLoops as $genLoop) {
-                //    $genLoop->start(); // Do NOT use yield.
-                //}
                 $started = true;
                 \danog\madelineproto\Tools::wait(yield from $mp->API->loop());
                 break;
@@ -822,16 +841,6 @@ function simpleStartAndLoop(API $mp, string $eventHandler): void
     $mp->loop();
 }
 
-/*
-function secondsToNexMinute(float $now = null): int
-{
-    $now   = $now ?? \microtime(true);
-    $now   = (int) ($now * 1000000);
-    $next  = (int)ceil($now / 60) * 60;
-    $delay = $next - $now;
-    return $delay > 0 ? $delay : 60;
-}
-*/
 function secondsToNexMinute(float $now = null): int
 {
     $now = $now ?? \microtime(true);
@@ -846,4 +855,10 @@ function secondsToNexMinute(float $now = null): int
 function madelineMajorVersion(): int
 {
     return MTProto::V > 137 ? 6 : (MTProto::V > 105 ? 5 : 4);
+}
+
+function logCallStack(int $level = Logger::NOTICE): void
+{
+    $e = new \Exception;
+    Logger::log($e->getTraceAsString(), $level);
 }

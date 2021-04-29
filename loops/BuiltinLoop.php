@@ -33,7 +33,7 @@ class BuiltinLoop extends AbstractLoop implements Loop
         yield $this->eh->sleep(1);
         $delay = $this->secondsToNexMinute();
         if ($loopState === 'on') {
-            $this->logger("The '{$this}' loop plugin's next invocation is in $delay seconds!", Logger::ERROR);
+            //$this->logger("The '{$this}' loop plugin's next invocation is in $delay seconds!", Logger::ERROR);
         }
         return $delay; // Repeat at the very begining of the next minute, sharp.
     }

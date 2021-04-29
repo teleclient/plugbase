@@ -24,7 +24,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
 
     public function __destruct()
     {
-        Logger::log("Destructing the 'builtin' loop handler!", Logger::ERROR);
+        Logger::log("Destructing the 'builtin' handler plugin!", Logger::ERROR);
         parent::__destruct();
     }
 
