@@ -4,7 +4,7 @@ A Pluggable Base for MadelineProto Library
 
 The program's core accepts two types of plugins; event-handler plugins, and repeating task plugins.
 
-Event-Handler plugins
+***Event-Handler plugins
 
 Each event-handler plugin extends an abstract class which provides basic services to plugins which minimimizes the efforts for writing a new plugin.
 
