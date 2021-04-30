@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-use danog\MadelineProto\Logger;
-use function Amp\File\{get, put, exists, getSize};
+use function Amp\File\{get};
 
 class Launch
 {
@@ -115,7 +114,6 @@ class Launch
         }
         $content = substr($content, 1);
         $lines = explode("\n", $content);
-        yield $eh->logger("Launches Count:" . count($lines), Logger::ERROR);
         $record = null;
         foreach ($lines as $line) {
             if (str_begins_with($line, $key . ' ')) {

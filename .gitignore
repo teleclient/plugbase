@@ -20,13 +20,19 @@ madeline.madeline.safe.php
 bot*.lock
 *.script.lock
 
+*.madeline
+*.madeline.lock
+*.madeline.script.lock
+
 trace.txt
 error_log
 junk*
 *.log
+mahyar.log
 
 data/
 config.php
+helpText.php
 authser.authkey
 
 .vscode/
@@ -35,3 +41,5 @@ nbproject/
 trace.txt
 nbproject/
 /junk/
+
+MiningHandler.php

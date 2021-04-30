@@ -24,7 +24,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
 
     public function __destruct()
     {
-        Logger::log("Destructing BuiltinHandler!", Logger::ERROR);
+        Logger::log("Destructing the 'builtin' handler plugin!", Logger::ERROR);
         parent::__destruct();
     }
 
@@ -74,7 +74,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
             return false;
         }
 
-        if ($eh->newMessage($update)) {
+        if ($eh->recentMessage($update)) {
 
             //Function: Finnish executing the Stop command.
             if ($vars['msgText'] === self::STOPPING_MSG) {
@@ -84,6 +84,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $eh->logger('Robot stopped at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->stop();
                 $eh->setStopReason('stop');
+                $eh->destroyLoops();
                 return true;
             }
 
@@ -92,6 +93,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $eh->logger('Robot restarted at ' . $eh->formatTime() . '!', Logger::ERROR);
                 yield $eh->restart();
                 $eh->setStopReason('restart');
+                $eh->destroyLoops();
                 return true;
             }
 
@@ -104,6 +106,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 yield $eh->logout();
                 yield $eh->stop();
                 $eh->setStopReason('logout');
+                $eh->destroyLoops();
                 return true;
             }
         }
@@ -137,17 +140,18 @@ class BuiltinHandler extends AbstractHandler implements Handler
             case '':
                 break;
             case 'help':
-                $text = getHelpText($eh->getPrefixes());
+                $text = $eh->getHelpText($eh->getPrefixes());
                 yield respond($eh, $peer, $msgId, $text);
                 $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'status':
-                $sessionCreation = yield $eh->getSessionCreation();
+                //$sessionCreation = yield $eh->getSessionCreation();
                 $peakMemUsage    = formatBytes(\getPeakMemory(), 3);
                 $currentMemUsage = formatBytes(\getCurrentMemory(), 3);
                 $memoryLimit     = ini_get('memory_limit');
                 $memoryLimit     = $memoryLimit === '-1' || $memoryLimit === '0' ? 'MAX' : $memoryLimit;
-                $sessionSize     = formatBytes(getFileSize($eh->getSessionName()), 3);
+                $eh->logger("Session Name: '" . $eh->getSessionName() . "'", Logger::ERROR);
+                $sessionSize     = formatBytes(\fileSize($eh->getSessionName()), 3);
                 $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
                 if ($launch) {
                     $lastStartTime        = $eh->formatTime($launch['time_start']);
@@ -174,7 +178,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: " . $eh->getRobotId() . "<br>";
-                $status .= "Session Age: "              . \UserDate::duration($sessionCreation,               $now) . "<br>";
+                //$status .= "Session Age: "              . \UserDate::duration($sessionCreation,               $now) . "<br>";
                 $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),        $now) . "<br>";
                 $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),   $now) . "<br>";
                 //$status .= "Handler Unserialized Age: " . \UserDate::duration($eh->getHandlerUnserialized(),$now) . "<br>";
@@ -311,32 +315,15 @@ class BuiltinHandler extends AbstractHandler implements Handler
                     yield respond($eh, $peer, $msgId, $text);
                     break;
                 }
-                if (false) {
-                    if ($action === 'off') {
-                        yield $loopObj->pause();
-                        $text = "The $loopname loop plugin pauseed!";
-                        yield respond($eh, $peer, $msgId, $text);
-                        $eh->logger($text, Logger::ERROR);
-                    } elseif ($action === 'on') {
-                        yield $loopObj->resume();
-                        $text = "The $loopname loop plugin resumed!";
-                        yield respond($eh, $peer, $msgId, $text);
-                        $eh->logger($text, Logger::ERROR);
-                    } elseif ($action === 'state') {
-                        $text = "The command  '/loop $loopname state' received!";
-                        yield respond($eh, $peer, $msgId, $text);
-                        $eh->logger($text, Logger::ERROR);
-                    }
-                }
                 $loopStatePrev = $eh->getLoopState($loopname);
-                $loopState     = $action === 'on' ? true : ($action === 'off' ? false : $loopStatePrev);
-                $text = "The $loopname loop plugin state is " . ($loopState ? 'ON' : 'OFF') . '!';
+                $loopState     = $action === 'on' ? 'on' : ($action === 'off' ? 'off' : $loopStatePrev);
+                $text = "The $loopname loop plugin state is " . ($loopState === 'on' ? 'ON' : 'OFF') . '!';
                 $eh->logger($text, Logger::ERROR);
                 yield respond($eh, $peer, $msgId, $text);
                 if ($loopState !== $loopStatePrev) {
                     $eh->setLoopState($loopname, $loopState);
                 }
-                if ($loopStatePrev === false && $loopState === true) {
+                if ($loopStatePrev === 'off' && $loopState === 'on') {
                     //$loopObj->resume();
                 }
                 $eh->logger("The command '$msgText' successfully executed!", Logger::ERROR);
@@ -377,7 +364,9 @@ class BuiltinHandler extends AbstractHandler implements Handler
     }
     public function setNotif(string $notification): void
     {
-        if ($notification === '') throw new ErrorException("Invalid parameters: '$notification'");
+        if ($notification === '') {
+            throw new ErrorException("Invalid parameters: '$notification'");
+        }
         $this->eh->__set('notification', $notification);
     }
 }

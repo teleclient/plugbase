@@ -24,7 +24,12 @@ abstract class AbstractLoop extends ResumableSignalLoop
         $this->eh = $eh;
         $this->robotConfig = $GLOBALS['robotConfig'];
         $this->userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
-        $this->eh->logger("AbstractLoop constructor for '{$this}' is invoked", Logger::ERROR);
+        $this->eh->logger("AbstractLoop constructor for the '{$this}' is invoked!", Logger::ERROR);
+    }
+
+    public function __destruct()
+    {
+        Logger::log("AbstractLoop destructor for the '{$this}' loop plugin is invoked!", Logger::ERROR);
     }
 
     function __sleep(): array
@@ -34,7 +39,7 @@ abstract class AbstractLoop extends ResumableSignalLoop
 
     public function onStart(): \Generator
     {
-        $this->start();
+        $this->eh->logger("'{this}' AbstractLoop::onStart invoked!", Logger::ERROR);
         if (method_exists($this, 'onStart')) {
             yield $this->onStart();
         }
@@ -43,18 +48,18 @@ abstract class AbstractLoop extends ResumableSignalLoop
 
     public function loop(): \Generator
     {
-        $state = $this->eh->getLoopState((string)$this);
-        $this->eh->logger("AbstractLoop loop invoked for '{$this}' with " . ($state ? 'ON' : 'OFF') . " state!", Logger::ERROR);
+        $loopState = $this->eh->getLoopState((string)$this);
+        $this->eh->logger("AbstractLoop loop invoked for '{$this}' with " . ($loopState === 'on' ? 'ON' : 'OFF') . " state!", Logger::ERROR);
         while (true) {
-            $state   = $this->eh->getLoopState((string)$this);
-            $timeout = yield $this->pluggedLoop($state);
+            $loopState   = $this->eh->getLoopState((string)$this);
+            $timeout = yield $this->task($loopState);
             if ($timeout === self::PAUSE) {
                 //$this->eh->logger->logger("Pausing {$this} loop!", Logger::ERROR);
             } elseif ($timeout > 0) {
                 //$this->eh->logger->logger("Pausing {$this} loop for {$timeout} seconds!", Logger::ERROR);
             }
             if ($timeout === self::STOP || yield $this->waitSignal($this->pause($timeout))) {
-                //$this->eh->logger("The {$this} loop plugin exited!", Logger::ERROR);
+                $this->eh->logger("The {$this} loop plugin exited!", Logger::ERROR);
                 return;
             }
         }
@@ -100,9 +105,9 @@ abstract class AbstractLoop extends ResumableSignalLoop
     }
 
     /**
-     * pluggedLoop.
+     * task.
      *
-     * The return value of the pluggedLoop can be:
+     * The return value of the task method can be:
      *    A number           - the loop will be paused for the specified number of seconds
      *    GenericLoop::STOP  - The loop will stop
      *    GenericLoop::PAUSE - The loop will pause forever (or until the `resume` method is called on 
@@ -113,5 +118,5 @@ abstract class AbstractLoop extends ResumableSignalLoop
      * @param callable                 $callback Callback to run
      * @param string                   $name     Fetcher name
      */
-    abstract protected function pluggedLoop(bool $state): \Generator;
+    abstract protected function task(string $loopState): \Generator;
 }

@@ -1,6 +1,6 @@
 {
-    "name": "teleclient/plugablebase",
-    "description": "Project description",
+    "name": "teleclient/plugbase",
+    "description": "Plugable Telegram robot base code",
     "type": "project",
     "license": "AGPL-3.0-only",
     "require": {

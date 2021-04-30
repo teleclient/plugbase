@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pkill lsphp
+pkill -9 lsphp
 
 #lsphp:ns/tlgbots.com/public_html/plugbase/index.php
 

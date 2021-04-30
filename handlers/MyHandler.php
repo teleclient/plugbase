@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-class YourHandler extends AbstractHandler implements Handler
+class MyHandler extends AbstractHandler implements Handler
 {
     private BaseEventHandler $eh;
 
