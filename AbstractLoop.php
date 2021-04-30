@@ -39,7 +39,7 @@ abstract class AbstractLoop extends ResumableSignalLoop
 
     public function onStart(): \Generator
     {
-        $this->start();
+        $this->eh->logger("'{this}' AbstractLoop::onStart invoked!", Logger::ERROR);
         if (method_exists($this, 'onStart')) {
             yield $this->onStart();
         }
@@ -52,7 +52,7 @@ abstract class AbstractLoop extends ResumableSignalLoop
         $this->eh->logger("AbstractLoop loop invoked for '{$this}' with " . ($loopState === 'on' ? 'ON' : 'OFF') . " state!", Logger::ERROR);
         while (true) {
             $loopState   = $this->eh->getLoopState((string)$this);
-            $timeout = yield $this->pluggedLoop($loopState);
+            $timeout = yield $this->task($loopState);
             if ($timeout === self::PAUSE) {
                 //$this->eh->logger->logger("Pausing {$this} loop!", Logger::ERROR);
             } elseif ($timeout > 0) {
@@ -105,9 +105,9 @@ abstract class AbstractLoop extends ResumableSignalLoop
     }
 
     /**
-     * pluggedLoop.
+     * task.
      *
-     * The return value of the pluggedLoop can be:
+     * The return value of the task method can be:
      *    A number           - the loop will be paused for the specified number of seconds
      *    GenericLoop::STOP  - The loop will stop
      *    GenericLoop::PAUSE - The loop will pause forever (or until the `resume` method is called on 
@@ -118,5 +118,5 @@ abstract class AbstractLoop extends ResumableSignalLoop
      * @param callable                 $callback Callback to run
      * @param string                   $name     Fetcher name
      */
-    abstract protected function pluggedLoop(string $loopState): \Generator;
+    abstract protected function task(string $loopState): \Generator;
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
+use danog\madelineproto\Shutdown;
 use danog\madelineproto\MTProto;
 use function Amp\File\{get, put, exists, getSize};
 
@@ -486,10 +487,10 @@ function respond(object $eh, array $peer, int $msgId, string $text, bool $edit =
     return $result;
 }
 
-function getFileSize(string $file): int
+function getFileSize(string $file): string
 {
     clearstatcache(true, $file);
-    $size = filesize($file);
+    $size = \filesize($file);
     return $size !== false ? $size : 0;
 
     if ($size === false) {
@@ -566,7 +567,7 @@ function getCurrentMemory(): int
     return $mem;
 }
 
-function formatBytes(int $bytes, int $precision = 2)
+function formatBytes(int $bytes, int $precision = 2): string
 {
     $units = array('B', 'KiB', 'MiB', 'GiB', 'TiB');
     $bytes = max($bytes, 0);
@@ -760,43 +761,60 @@ function safeStartAndLoop(API $mp, string $eventHandler, ?string &$stopReason, b
                 $stateBeforeStr  = authorizationStateDesc($authStateBefore);
                 $hasAllAuth      = $authStateBefore === -2 ? false : $mp->hasAllAuth();  // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
                 $hasAllAuthStr   = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
-                $mp->logger("Authorization state before invoking the start method: '$stateBeforeStr'!  " . $hasAllAuthStr, Logger::ERROR);
-                if (!$mp->hasAllAuth() || authorizationState($mp) !== MTProto::LOGGED_IN) {
-                    $mp->logger("Not Logged-in!", Logger::ERROR);
-                }
+                $mp->logger("Authorization state before invoking the start method is '$stateBeforeStr'!  " . $hasAllAuthStr, Logger::ERROR);
                 if ($authStateBefore === 4) {  // 4 => 'INVALID_APP' 
                     echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
                     Logger::log("Invalid App, or the Session is corrupted!", Logger::ERROR);
+                    \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
+                    removeShutdownHandlers();
+                    exit(0);
                 }
                 if ($authStateBefore === MTProto::LOGGED_IN && !$hasAllAuth) {
-                    Logger::log("The Session is terminated or corrupted!", Logger::ERROR);
+                    Logger::log("The Session is logged-out, externally terminated or the account is deleted!", Logger::ERROR);
+                    Logger::log("newSession:" . ($newSession ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("All  Auth: " . ($mp->hasAllAuth() ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+                    Logger::log('The session is logged out of, externally terminated, or its account is deleted!', Logger::ERROR);
+                    \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
+                    removeShutdownHandlers();
+                    exit(0);
+                }
+                if (!$newSession && (!$mp->hasAllAuth() || authorizationState($mp) !== MTProto::LOGGED_IN)) {
+                    Logger::log("newSession:" . ($newSession ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("All  Auth: " . ($mp->hasAllAuth() ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+                    Logger::log('The session is logged out of, externally terminated, or its account is deleted!', Logger::ERROR);
+                    \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
+                    removeShutdownHandlers();
+                    exit(0);
                 }
 
                 $stopReasonSaved = $stopReason;
-                $stopReason = 'authorization';
+                $stopReason = $stateBeforeStr;
                 $me = yield $mp->start();
                 $stopReason = $stopReasonSaved;
 
-                $stateAfter    = authorizationState($mp);
-                $stateAfterStr = authorizationStateDesc($stateAfter);
-                $hasAllAuth = "Has all authorizations: " . ($mp->hasAllAuth() ? "'true'" : "'false'");
-                $mp->logger("Authorization state after invoking the start method is '$stateAfterStr'!" . $hasAllAuth, Logger::ERROR);
-                if (!$mp->hasAllAuth() || authorizationState($mp) !== 3) {
-                    $mp->logger("Unsuccessful Login!", Logger::ERROR);
-                    throw new ErrorException('Unsuccessful Login!');
+                $stateAfter     = authorizationState($mp);
+                $stateAfterStr  = authorizationStateDesc($stateAfter);
+                $hasAllAuth     = $authStateBefore === -2 ? false : $mp->hasAllAuth();  // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
+                $hasAllAuthText = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
+                $mp->logger("Authorization state after  invoking the start method is '$stateAfterStr'!  " . $hasAllAuthText, Logger::ERROR);
+                if (!$hasAllAuth || $stateAfter !== MTProto::LOGGED_IN) {
+                    $mp->logger("Auth State after invoking the start method: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
                 } else {
                     if ($newSession) {
-                        $new = saveNewSessionCreation(DATA_DIRECTORY, 'creation.txt', SCRIPT_START_TIME);
+                        $new = saveNewSessionCreation(DATA_DIRECTORY, CREATION_FILE_NAME, SCRIPT_START_TIME);
                         if (!$new) {
                             throw new ErrorException('Session creation logic error');
                         }
                     }
-                    $mp->logger("Robot is currently logged-in!", Logger::ERROR);
+                    $mp->logger("Auth State after invoking the start method: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+                    $mp->logger("Robot is successfully logged-in!", Logger::ERROR);
                 }
                 if (!$me || !is_array($me)) {
                     throw new ErrorException('Invalid Self object');
                 }
-                \closeConnection('Bot was started!');
+                \closeConnection('The roboot with the script ' . SCRIPT_INFO . ' was started!');
 
                 if (!$mp->hasEventHandler()) {
                     yield $mp->setEventHandler($eventHandler);
@@ -861,4 +879,108 @@ function logCallStack(int $level = Logger::NOTICE): void
 {
     $e = new \Exception;
     Logger::log($e->getTraceAsString(), $level);
+}
+
+
+/**
+ * Close the connection to the browser but continue processing the operation
+ * @param $body
+ */
+function closeConnection(string $message = 'OK', int $responseCode = 200): void
+{
+    if (PHP_SAPI === 'cli' || \headers_sent()) {
+        return;
+    }
+    Logger::log($message, Logger::FATAL_ERROR);
+
+    $buffer  = @\ob_get_clean() ?: '';
+    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
+
+    // Cause we are clever and don't want the rest of the script to be bound by a timeout.
+    // Set to zero so no time limit is imposed from here on out.
+    set_time_limit(0);
+
+    // if using (u)sleep in an XHR the next requests are still hanging until sleep finishes
+    session_write_close();
+
+    // Client disconnect should NOT abort our script execution
+    ignore_user_abort(true);
+
+    // Clean (erase) the output buffer and turn off output buffering
+    // in case there was anything up in there to begin with.
+    if (ob_get_length() > 0) {
+        ob_end_clean();
+    }
+
+    // Turn on output buffering, because ... we just turned it off ...
+    // if it was on.
+    ob_start();
+
+    echo $buffer;
+
+    // Return the length of the output buffer
+    $size = ob_get_length();
+
+    // send headers to tell the browser to close the connection
+    // remember, the headers must be called prior to any actual
+    // input being sent via our flush(es) below.
+    header("Connection: close\r\n");
+    header("Content-Encoding: none\r\n");
+    header("Content-Length: $size");
+
+    // Set the HTTP response code
+    // this is only available in PHP 5.4.0 or greater
+    http_response_code($responseCode);
+
+    // Flush (send) the output buffer and turn off output buffering
+    ob_end_flush();
+
+    // Flush (send) the output buffer
+    // This looks like overkill, but trust me. I know, you really don't need this
+    // unless you do need it, in which case, you will be glad you had it!
+    @ob_flush();
+
+    // Flush system output buffer
+    // I know, more over kill looking stuff, but this
+    // Flushes the system write buffers of PHP and whatever backend PHP is using
+    // (CGI, a web server, etc). This attempts to push current output all the way
+    // to the browser with a few caveats.
+    flush();
+}
+
+function removeShutdownHandlers(): void
+{
+    $class = new ReflectionClass('danog\MadelineProto\Shutdown');
+    $callbacks = $class->getStaticPropertyValue('callbacks');
+    //register_shutdown_function(function () {});
+    Shutdown::removeCallback('restart');
+    Shutdown::removeCallback(0);
+    Shutdown::removeCallback(0);
+    Shutdown::removeCallback(0);
+}
+
+function acquireScriptLock(string $sessionName, &$lock, $retryCount = 10): bool
+{
+    $acquired = true;
+    if (PHP_SAPI !== 'cli') {
+        $lockfile = $sessionName . '.script.lock';
+        if (!\file_exists($lockfile)) {
+            \touch($lockfile);
+        }
+        $lock = \fopen($lockfile, 'r+');
+        $try = 1;
+        $locked = false;
+        while (!$locked) {
+            $locked = \flock($lock, LOCK_EX | LOCK_NB);
+            if (!$locked) {
+                if ($try++ >= $retryCount) {
+                    $acquired = false;
+                    return $acquired;
+                }
+                \sleep(1);
+            }
+        }
+        return $acquired;
+    }
+    return $acquired;
 }

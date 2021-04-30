@@ -8,10 +8,12 @@ class BuiltinLoop extends AbstractLoop implements Loop
 {
     public function onStart(): \Generator
     {
-        yield $this->logger("Builtin Lopp onStart invoked!", Logger::ERROR);
+        $this->logger("Builtin Loop onStart invoked!", Logger::ERROR);
+        return;
+        yield;
     }
 
-    protected function pluggedLoop(string $loopState): \Generator
+    protected function task(string $loopState): \Generator
     {
         if ($loopState === 'on') {
             if (true) {

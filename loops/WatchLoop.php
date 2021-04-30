@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use danog\MadelineProto\Logger;
 use danog\MadelineProto\MTProto;
 
 // The watch loop-plugin configuration:
@@ -12,13 +13,22 @@ use danog\MadelineProto\MTProto;
 
 class WatchLoop extends AbstractLoop implements Loop
 {
-    protected function pluggedLoop(string $loopState): \Generator
+    public function onStart(): \Generator
     {
+        $this->logger("Builtin Loop onStart invoked!", Logger::ERROR);
+        return;
+        yield;
+    }
+
+    protected function task(string $loopState): \Generator
+    {
+        //$this->eh->logger("'watch' loop plug invoked!", Logger::ERROR);
+        //return 30;
         $state = authorizationState($this->eh);
-        if ($this->eh->hasAllAuth() || $state === MTProto::NOT_LOGGED_IN) {
-            $this->eh->notLoggedIn();
+        if (!$this->eh->hasAllAuth() || $state !== MTProto::LOGGED_IN) {
+            yield $this->eh->notAuthorized();
         }
-        return 5;
+        return 10;
         yield;
     }
 }

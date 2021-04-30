@@ -6,6 +6,7 @@ use danog\madelineproto\API;
 use danog\madelineproto\Logger;
 use danog\madelineproto\MTProto;
 use danog\madelineproto\Magic;
+use danog\madelineproto\Shutdown;
 use function Amp\File\{get, put, exists, getSize};
 
 require_once 'Handler.php';
@@ -210,8 +211,13 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     public function notAuthorized(): Generator
     {
         $this->notAuthorized = true;
-        return;
-        yield;
+        $this->logger("FATAL: Authorization revoked at " . $this->formatTime() . '!', Logger::FATAL_ERROR);
+        if (Shutdown::removeCallback('restarter')) {
+            $this->logger('Self-Restarter disabled.', Logger::ERROR);
+        }
+        yield $this->stop();
+        $this->setStopReason('sessiondelete');
+        $this->destroyLoops();
     }
     public function isAuthorized(): bool
     {
@@ -291,7 +297,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     function getSessionName(): string
     {
-        return $this->robotConfig['mp'][0]['session'] ?? 'madeline.madeline';
+        return __DIR__ . '/' . $this->robotConfig['mp'][0]['session'];
     }
 
     function getLoopNames(): array
@@ -363,14 +369,14 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         gc_collect_cycles();
     }
 
-    public function getSessionCreation(): \Generator // float
+    public function getSessionCreation(string $directory, string $file): \Generator // float
     {
-        $filepath = CREATION_FILE;
-        $strTime  = yield \Amp\File\get($filepath);
+        $fullpath = $directory . $file;
+        $strTime  = yield \Amp\File\get($fullpath);
         if ($strTime === null || $strTime === '') {
             $microTime = $this->getScriptStarted();
             $strTime   = strval(intval(round($microTime * 1000000)));
-            yield \Amp\File\put($filepath, $strTime);
+            yield \Amp\File\put($fullpath, $strTime);
         } else {
             $microTime = round(intval($strTime) / 1000000);
         }

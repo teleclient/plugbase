@@ -145,12 +145,13 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $eh->logger("Command '/help' successfuly executed at " . $eh->formatTime() . '!', Logger::ERROR);
                 break;
             case 'status':
-                $sessionCreation = yield $eh->getSessionCreation();
+                //$sessionCreation = yield $eh->getSessionCreation();
                 $peakMemUsage    = formatBytes(\getPeakMemory(), 3);
                 $currentMemUsage = formatBytes(\getCurrentMemory(), 3);
                 $memoryLimit     = ini_get('memory_limit');
                 $memoryLimit     = $memoryLimit === '-1' || $memoryLimit === '0' ? 'MAX' : $memoryLimit;
-                $sessionSize     = formatBytes(getFileSize($eh->getSessionName()), 3);
+                $eh->logger("Session Name: '" . $eh->getSessionName() . "'", Logger::ERROR);
+                $sessionSize     = formatBytes(\fileSize($eh->getSessionName()), 3);
                 $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
                 if ($launch) {
                     $lastStartTime        = $eh->formatTime($launch['time_start']);
@@ -177,7 +178,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: " . $eh->getRobotId() . "<br>";
-                $status .= "Session Age: "              . \UserDate::duration($sessionCreation,               $now) . "<br>";
+                //$status .= "Session Age: "              . \UserDate::duration($sessionCreation,               $now) . "<br>";
                 $status .= "Script Age: "               . \UserDate::duration($eh->getScriptStarted(),        $now) . "<br>";
                 $status .= "Handler Construction Age: " . \UserDate::duration($eh->getHandlerConstructed(),   $now) . "<br>";
                 //$status .= "Handler Unserialized Age: " . \UserDate::duration($eh->getHandlerUnserialized(),$now) . "<br>";

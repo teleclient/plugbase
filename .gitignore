@@ -20,6 +20,10 @@ madeline.madeline.safe.php
 bot*.lock
 *.script.lock
 
+*.madeline
+*.madeline.lock
+*.madeline.script.lock
+
 trace.txt
 error_log
 junk*

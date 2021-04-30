@@ -5,8 +5,9 @@ return [
     //'ownerid'   => 1234,
     //'officeid'  => 1234,
     //'host'      => '', // <== In case $_SERVER['SERVER_NAME'] is not defined, set the webserver's host name.
-    'zone'        => 'Asia/Tehran',
+    'zone'        => 'UTC',
     'prefixes'    => '!/',
+    'source'      => 'phar 5.1.34',
     'edit'        => false,
     'maxrestarts' => 10,
     'mp'   => [
@@ -25,7 +26,7 @@ return [
                 ],
                 'logger' => [
                     'logger'       => 2,  // 2:FILE_LOGGER
-                    'logger_level' => 3,  // 1:ERROR 2:WARNING 3:NOTICE 4:VERBOSE
+                    'logger_level' => 2,  // 1:ERROR 2:WARNING 3:NOTICE 4:VERBOSE
                     'logger_param' => __DIR__ . '/MadelineProto.log',
                     'max_size'     => 100 * 1024 * 1024
                 ],

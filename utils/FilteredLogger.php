@@ -98,7 +98,7 @@ class FilteredLogger
                 $request = trim(substr($entry, 17));
                 $this->filteredLog->logger($entry, 0, $file);
                 $this->filteredLog->logger("Could not resend request '$request'!", 0, $file);
-                Shutdown::removeCallback('duration');
+                //Shutdown::removeCallback('duration');
                 Shutdown::removeCallback('restarter');
                 Shutdown::removeCallback(0);
                 Shutdown::removeCallback(1);

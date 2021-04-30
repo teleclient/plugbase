@@ -16,10 +16,13 @@ copy($srcRoot . "Loop.php",             $buildRoot . "Loop.php");
 copy($srcRoot . "AbstractLoop.php",     $buildRoot . "AbstractLoop.php");
 copy($srcRoot . ".htaccess",            $buildRoot . ".htaccess");
 
-copy($srcRoot . "functions.php",      $buildRoot . "functions.php");
-copy($srcRoot . "Launch.php",         $buildRoot . "Launch.php");
-copy($srcRoot . "FilteredLogger.php", $buildRoot . "FilteredLogger.php");
-copy($srcRoot . "UserDate.php",       $buildRoot . "UserDate.php");
+if (!file_exists('build/utils')) {
+    mkdir('build/utils');
+}
+copy($srcRoot . "utils/FilteredLogger.php", $buildRoot . "utils/FilteredLogger.php");
+copy($srcRoot . "utils/functions.php",      $buildRoot . "utils/functions.php");
+copy($srcRoot . "utils/Launch.php",         $buildRoot . "utils/Launch.php");
+copy($srcRoot . "utils/UserDate.php",       $buildRoot . "utils/UserDate.php");
 
 copy($srcRoot . "config.sample.php",  $buildRoot . "config.sample.php");
 
@@ -34,6 +37,7 @@ if (!file_exists('build/loops.sample')) {
 }
 copy($srcRoot . "loops/BuiltinLoop.php", $buildRoot . "loops.sample/BuiltinLoop.php");
 copy($srcRoot . "loops/MyLoop.php",      $buildRoot . "loops.sample/MyLoop.php");
+copy($srcRoot . "loops/WatchLoop.php",   $buildRoot . "loops.sample/WatchLoop.php");
 
 echo "$buildRoot successfully created" . PHP_EOL;
 

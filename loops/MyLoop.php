@@ -11,7 +11,7 @@ class MyLoop extends AbstractLoop implements Loop
         yield $this->eh->sleep(0); // Not really needed
     }
 
-    protected function pluggedLoop(string $loopState): \Generator
+    protected function task(string $loopState): \Generator
     {
         if ($loopState === 'on') {
             $time  = $this->userDate->format();
