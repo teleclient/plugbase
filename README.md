@@ -4,7 +4,7 @@ A Pluggable Base for MadelineProto Library
 
 The program's core accepts two types of plugins; event-handler plugins, and repeating task plugins.
 
-***Event-Handler plugins
+## Event-Handler plugins
 
 Each event-handler plugin extends an abstract class which provides basic services to plugins which minimimizes the efforts for writing a new plugin.
 
@@ -38,5 +38,11 @@ If you need to initialize your class, you can add the onStart method to your cla
     }
 ```
 
-hhhh
+No need to mention that you can use any features of PHP class in your plugins.
+
+To integrate your handler plugin, you must add it's name as an element to the handler array in the config.php file.
+
+```php
+'loops' => [... , 'PingHandler', ...],
+```
 
