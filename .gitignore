@@ -1,6 +1,7 @@
 composer.phar
 /vendor/
 /build/
+composer.lock
 
 madeline.phar
 madeline.phar.version
