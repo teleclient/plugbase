@@ -10,7 +10,7 @@ use danog\MadelineProto\MTProto;
 use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
 
-//require 'utils/functions.php';
+require 'utils/functions.php';
 require 'utils/UserDate.php';
 require 'utils/FilteredLogger.php';
 require 'utils/Launch.php';

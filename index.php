@@ -63,6 +63,8 @@ $scriptStartStr = $userDate->format(SCRIPT_START_TIME);
 $scriptInfo = SCRIPT_INFO;
 $hostname   = hostname() ?? 'UNDEFINED';
 
+require 'Robot.php';
+
 $restartsCount = checkTooManyRestarts(STARTUPS_FILE);
 $maxrestarts   = $robotConfig['maxrestarts'] ?? 10;
 if ($restartsCount > $maxrestarts) {
