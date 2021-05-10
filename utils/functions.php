@@ -7,7 +7,8 @@ use danog\madelineproto\Logger;
 use danog\MadelineProto\RPCErrorException;
 use danog\madelineproto\Shutdown;
 use danog\madelineproto\MTProto;
-use function Amp\File\{get, put, exists, getSize};
+use danog\madelineproto\Magic;
+use function Amp\File\{get, put, exists, getSize, touch};
 
 function toJSON($var, bool $pretty = true): ?string
 {
@@ -109,11 +110,11 @@ function includeMadeline(string $spec = 'phar'): void
             }
             $param = $param ?? '5.1.34';
             define('MADELINE_BRANCH', $param);
-            include 'madeline.php';
+            require 'madeline.php';
             break;
         case 'composer':
             $prefix = !$param ? '' : ($param . '/');
-            include $prefix . 'vendor/autoload.php';
+            require $prefix . 'vendor/autoload.php';
             break;
         default:
             throw new \ErrorException("Invalid argument: '$source'");
@@ -619,19 +620,33 @@ function getLaunchMethod(): string
         $interface    = 'web';
         $launchMethod = 'UNKNOWN';
         if (isset($_REQUEST['MadelineSelfRestart'])) {
-            $launchMethod = 'restart';
-        } elseif (isset($_SERVER['REQUEST_URI'])) {
-            $requestUri = htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8');
-            if (stripos($requestUri, '?MadelineSelfRestart=') !== false) {
-                $launchMethod = 'restart';
-            } else if (stripos($requestUri, 'cron') !== false) {
-                $launchMethod = 'cron';
-            } else {
-                $launchMethod = 'manual';
-            }
+            $launchMethod = 'autorestart';
+        } elseif (isRequestByBrowser()) {
+            $launchMethod = 'manual';
+        } else {
+            $launchMethod = 'cron';
         }
     }
     return $launchMethod;
+}
+
+function getPhpInterface(): string
+{
+    return PHP_SAPI === 'cli' ? 'cli' : 'web';
+}
+
+function isRequestByBrowser(): bool
+{
+    $agent = $_SERVER["HTTP_USER_AGENT"] ?? '';
+    $name = null;
+    if (strpos($agent, 'Opera') || strpos($agent, 'OPR/')) $name = 'Opera';
+    elseif (strpos($agent, 'Edge')) $name =  'Edge';
+    elseif (strpos($agent, 'Chrome')) $name =  'Chrome';
+    elseif (strpos($agent, 'Safari')) $name =  'Safari';
+    elseif (strpos($agent, 'Firefox')) $name =  'Firefox';
+    elseif (strpos($agent, 'MSIE') || strpos($agent, 'Trident/7')) $name =  'IE';
+    elseif (preg_match("/(android|avantgo|blackberry|bolt|boost|cricket|docomo|fone|hiptop|mini|mobi|palm|phone|pie|tablet|up\.browser|up\.link|webos|wos)/i", $agent)) $name = 'mobile';
+    return $name === null ? false : true;
 }
 
 function initPhp(): void
@@ -639,14 +654,14 @@ function initPhp(): void
     \date_default_timezone_set('UTC');
     \ignore_user_abort(true);
     \set_time_limit(0);
-    \error_reporting(E_ALL);                                 // always TRUE
-    ini_set('ignore_repeated_errors', '1');                 // always TRUE
+    \error_reporting(E_ALL); // always TRUE
+    ini_set('ignore_repeated_errors', '1'); // always TRUE
     ini_set('display_startup_errors', '1');
-    ini_set('display_errors',         '1');                 // FALSE only in production or real server
-    ini_set('default_charset',        'UTF-8');
-    ini_set('precision',              '18');
-    ini_set('log_errors',             '1');                 // Error logging engine
-    ini_set('error_log',              'MadelineProto.log'); // Logging file path
+    ini_set('display_errors', '1'); // FALSE only in production or real server
+    ini_set('default_charset', 'UTF-8');
+    ini_set('precision', '18');
+    ini_set('log_errors', '1'); // Error logging engine
+    ini_set('error_log', 'MadelineProto.log'); // Logging file path
 }
 
 function checkTooManyRestartsAsync(object $eh, string $startupFilename): \Generator
@@ -658,6 +673,7 @@ function checkTooManyRestartsAsync(object $eh, string $startupFilename): \Genera
         $startups = explode('\n', $startupsText);
     } else {
         // Create the file
+        yield touch($startupFilename);
     }
     $startupsCount0 = count($startups);
 
@@ -697,14 +713,16 @@ function checkTooManyRestarts(string $startupFilename): int
     }
     $startups[] = strval($nowMilli);
     $startupsText = implode("\n", $startups);
+    if (!file_exists($startupFilename)) {
+        \touch($startupFilename);
+    }
     \file_put_contents($startupFilename, $startupsText);
     $restartsCount = count($startups);
     return $restartsCount;
 }
-
 function myStartAndLoop(API $MadelineProto, string $eventHandler, array $genLoops = [], int $maxRecycles = 10): void
 {
-    $maxRecycles  = 10;
+    $maxRecycles = 10;
     $recycleTimes = [];
     while (true) {
         try {
@@ -747,63 +765,68 @@ function myStartAndLoop(API $MadelineProto, string $eventHandler, array $genLoop
     };
 }
 
-function safeStartAndLoop(API $mp, string $eventHandler, ?string &$stopReason, bool $newSession): void
+function safeStartAndLoop(API $mp, string $eventHandler): void
 {
     $mp->async(true);
     //$mp->__set('config', $robotConfig);
-    $mp->loop(function () use ($mp, $eventHandler, &$stopReason, $newSession) {
+    $mp->loop(function () use ($mp, $eventHandler) {
         $errors = [];
         while (true) {
             try {
                 $started = false;
 
+                $processId = \getmypid() === false ? 0 : \getmypid();
                 $authStateBefore = authorizationState($mp);
-                $stateBeforeStr  = authorizationStateDesc($authStateBefore);
-                $hasAllAuth      = $authStateBefore === -2 ? false : $mp->hasAllAuth();  // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
-                $hasAllAuthStr   = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
-                $mp->logger("Authorization state before invoking the start method is '$stateBeforeStr'!  " . $hasAllAuthStr, Logger::ERROR);
-                if ($authStateBefore === 4) {  // 4 => 'INVALID_APP' 
+                $stateBeforeStr = authorizationStateDesc($authStateBefore);
+                $hasAllAuth = $authStateBefore === -2 ? false : $mp->hasAllAuth(); // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
+                $hasAllAuthStr = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
+                $mp->logger("Authorization state before invoking the start method is '$stateBeforeStr'! " . $hasAllAuthStr, Logger::ERROR);
+                if ($authStateBefore === 4) { // 4 => 'INVALID_APP'
                     echo (PHP_EOL . "Invalid App, or the Session is corrupted!<br>" . PHP_EOL . PHP_EOL);
                     Logger::log("Invalid App, or the Session is corrupted!", Logger::ERROR);
-                    \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
+                    \closeConnection("The robot's session is locally logged out of, externally terminated, or its account is deleted!");
                     removeShutdownHandlers();
                     exit(0);
                 }
                 if ($authStateBefore === MTProto::LOGGED_IN && !$hasAllAuth) {
-                    Logger::log("The Session is logged-out, externally terminated or the account is deleted!", Logger::ERROR);
-                    Logger::log("newSession:" . ($newSession ? "'true'" : "'false'"), Logger::ERROR);
-                    Logger::log("All  Auth: " . ($mp->hasAllAuth() ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("The robot is in 'logged-in' but is 'not authorized'!", Logger::ERROR);
+                    //Logger::log("The Session is manually logged-out, externally terminated or the account is deleted!", Logger::ERROR);
+                    //Logger::log("Already Auth:" . (Magic::$storage['already_auth'] ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("All Auth: " . ($mp->hasAllAuth() ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+                    Logger::log('The session is locally logged out of, externally terminated, or its account is deleted!', Logger::ERROR);
+                    \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
+                    removeShutdownHandlers();
+                    exit(0);
+                }
+                /*
+                if (!Magic::$storage['already_auth'] && (!$mp->hasAllAuth() || authorizationState($mp) !== MTProto::LOGGED_IN)) {
+                    Logger::log("Already Auth:" . (Magic::$storage['already_auth'] ? "'true'" : "'false'"), Logger::ERROR);
+                    Logger::log("All Auth: " . ($mp->hasAllAuth() ? "'true'" : "'false'"), Logger::ERROR);
                     Logger::log("Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
                     Logger::log('The session is logged out of, externally terminated, or its account is deleted!', Logger::ERROR);
                     \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
                     removeShutdownHandlers();
                     exit(0);
                 }
-                if (!$newSession && (!$mp->hasAllAuth() || authorizationState($mp) !== MTProto::LOGGED_IN)) {
-                    Logger::log("newSession:" . ($newSession ? "'true'" : "'false'"), Logger::ERROR);
-                    Logger::log("All  Auth: " . ($mp->hasAllAuth() ? "'true'" : "'false'"), Logger::ERROR);
-                    Logger::log("Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
-                    Logger::log('The session is logged out of, externally terminated, or its account is deleted!', Logger::ERROR);
-                    \closeConnection("The robot's session is logged out of, externally terminated, or its account is deleted!");
-                    removeShutdownHandlers();
-                    exit(0);
-                }
+                */
 
-                $stopReasonSaved = $stopReason;
-                $stopReason = $stateBeforeStr;
-                $me = yield $mp->start();
-                $stopReason = $stopReasonSaved;
+                $stopReasonSaved = Magic::$storage['stop_reason'];
+                Magic::$storage['stop_reason'] = $stateBeforeStr;
+                $start = new Start($mp);
+                $me    = yield $start->start();
+                Magic::$storage['stop_reason'] = $stopReasonSaved;
 
-                $stateAfter     = authorizationState($mp);
-                $stateAfterStr  = authorizationStateDesc($stateAfter);
-                $hasAllAuth     = $authStateBefore === -2 ? false : $mp->hasAllAuth();  // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
+                $stateAfter = authorizationState($mp);
+                $stateAfterStr = authorizationStateDesc($stateAfter);
+                $hasAllAuth = $authStateBefore === -2 ? false : $mp->hasAllAuth(); // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
                 $hasAllAuthText = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
-                $mp->logger("Authorization state after  invoking the start method is '$stateAfterStr'!  " . $hasAllAuthText, Logger::ERROR);
+                $mp->logger("Authorization state after invoking the start method is '$stateAfterStr'! " . $hasAllAuthText, Logger::ERROR);
                 if (!$hasAllAuth || $stateAfter !== MTProto::LOGGED_IN) {
                     $mp->logger("Auth State after invoking the start method: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
                 } else {
-                    if ($newSession) {
-                        $new = saveNewSessionCreation(DATA_DIRECTORY, CREATION_FILE_NAME, SCRIPT_START_TIME);
+                    if (!Magic::$storage['already_auth']) {
+                        $new = saveNewSessionCreation(SCRIPT_START_TIME);
                         if (!$new) {
                             throw new ErrorException('Session creation logic error');
                         }
@@ -811,16 +834,16 @@ function safeStartAndLoop(API $mp, string $eventHandler, ?string &$stopReason, b
                     $mp->logger("Auth State after invoking the start method: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
                     $mp->logger("Robot is successfully logged-in!", Logger::ERROR);
                 }
-                if (!$me || !is_array($me)) {
+                if ((!$me || !is_array($me)) && $stateAfter === MTProto::LOGGED_IN) {
                     throw new ErrorException('Invalid Self object');
                 }
-                \closeConnection('The roboot with the script ' . SCRIPT_INFO . ' was started!');
+                \closeConnection('The roboot with the script ' . Magic::$storage['script_info'] . ' was started!');
 
                 if (!$mp->hasEventHandler()) {
                     yield $mp->setEventHandler($eventHandler);
                     yield $mp->logger("EventHandler is set!", Logger::ERROR);
                 } else {
-                    yield $mp->setEventHandler($eventHandler); // For now.  To be investigated
+                    yield $mp->setEventHandler($eventHandler); // For now. To be investigated
                     yield $mp->logger("EventHandler was already set!", Logger::ERROR);
                 }
 
@@ -862,7 +885,7 @@ function simpleStartAndLoop(API $mp, string $eventHandler): void
 function secondsToNexMinute(float $now = null): int
 {
     $now = $now ?? \microtime(true);
-    $now  = (int) ($now * 1000000);
+    $now = (int) ($now * 1000000);
     $next = (int)ceil($now / 60000000) * 60000000;
     $diff = ($next - $now);
     $secs = (int)round($diff / 1000000);
@@ -881,7 +904,6 @@ function logCallStack(int $level = Logger::NOTICE): void
     Logger::log($e->getTraceAsString(), $level);
 }
 
-
 /**
  * Close the connection to the browser but continue processing the operation
  * @param $body
@@ -893,8 +915,14 @@ function closeConnection(string $message = 'OK', int $responseCode = 200): void
     }
     Logger::log($message, Logger::FATAL_ERROR);
 
-    $buffer  = @\ob_get_clean() ?: '';
-    $buffer .= '<html><body><h1>' . \htmlentities($message) . '</h1></body></html>';
+    $buffer = @\ob_get_clean() ?: '';
+    $buffer .= '<html>
+
+        <body>
+            <h1>' . \htmlentities($message) . '</h1>
+        </body>
+
+        </html>';
 
     // Cause we are clever and don't want the rest of the script to be bound by a timeout.
     // Set to zero so no time limit is imposed from here on out.
@@ -938,7 +966,7 @@ function closeConnection(string $message = 'OK', int $responseCode = 200): void
     // Flush (send) the output buffer
     // This looks like overkill, but trust me. I know, you really don't need this
     // unless you do need it, in which case, you will be glad you had it!
-    @ob_flush();
+    if (ob_get_level() > 0) ob_flush();
 
     // Flush system output buffer
     // I know, more over kill looking stuff, but this
@@ -955,12 +983,14 @@ function removeShutdownHandlers(): void
     //register_shutdown_function(function () {});
     Shutdown::removeCallback('restart');
     Shutdown::removeCallback(0);
-    Shutdown::removeCallback(0);
-    Shutdown::removeCallback(0);
+    Shutdown::removeCallback(1);
+    Shutdown::removeCallback(2);
+    Shutdown::removeCallback(3);
 }
 
 function acquireScriptLock(string $sessionName, &$lock, $retryCount = 10): bool
 {
+    // The $lock variable should not go out-of-scope in the calling context.
     $acquired = true;
     if (PHP_SAPI !== 'cli') {
         $lockfile = $sessionName . '.script.lock';

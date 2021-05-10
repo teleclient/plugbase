@@ -22,11 +22,9 @@ class WatchLoop extends AbstractLoop implements Loop
 
     protected function task(string $loopState): \Generator
     {
-        //$this->eh->logger("'watch' loop plug invoked!", Logger::ERROR);
-        //return 30;
         $state = authorizationState($this->eh);
         if (!$this->eh->hasAllAuth() || $state !== MTProto::LOGGED_IN) {
-            yield $this->eh->notAuthorized();
+            yield $this->eh->authorizationRevoked();
         }
         return 10;
         yield;

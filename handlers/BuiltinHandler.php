@@ -39,7 +39,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
         $dest       = $eh->getRobotId();
         if ($notifState) {
             $nowstr = $eh->formatTime($eh->getHandlerUnserialized());
-            $text = SCRIPT_INFO . ' started at ' . $nowstr . ' on ' . hostName() . ' using ' . $eh->getRobotName() . ' account.';
+            $text   = $eh->getScriptInfo() . ' started at ' . $nowstr . ' on ' . hostName() . ' using ' . $eh->getRobotName() . ' account.';
             $result = yield $eh->messages->sendMessage([
                 'peer'    => $dest,
                 'message' => $text
@@ -174,7 +174,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $notifStr   = "$notifState$notifAge";
                 $now        = \microtime(true);
 
-                $status  = '<b>STATUS:</b>  (Script: ' . SCRIPT_INFO . ')<br>';
+                $status  = '<b>STATUS:</b>  (Script: ' . $eh->getScriptInfo() . ')<br>';
                 $status .= "Host: " . hostname() . "<br>";
                 $status .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $status .= "Robot's User-Id: " . $eh->getRobotId() . "<br>";
@@ -236,7 +236,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                         $peerCounts[$subtype] += 1;
                     }
                 );
-                $stats  = '<b>STATISTICS</b>  (Script: ' . SCRIPT_INFO . ')<br>';
+                $stats  = '<b>STATISTICS</b>  (Script: ' . $eh->getScriptInfo() . ')<br>';
                 $stats .= "Robot's Account: " . $eh->getRobotName() . "<br>";
                 $stats .= "Total Dialogs: $totalDialogsOut<br>";
                 $stats .= "Users: {$peerCounts['user']}<br>";

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use danog\MadelineProto\Magic;
 use function Amp\File\{get};
 
 class Launch
@@ -10,9 +11,10 @@ class Launch
     {
     }
 
-    public static function appendLaunchRecord(string $fileName, float $scriptStartTime, string $stopReason): array
+    public static function appendLaunchRecord(float $scriptStartTime, string $stopReason): array
     {
         $key = self::floatToIntStr($scriptStartTime);
+        $fileName = Magic::$storage['launches_file'];
 
         $record['time_start']    = $key;
         $record['time_end']      = 0;
@@ -31,9 +33,10 @@ class Launch
         return $record;
     }
 
-    public static function updateLaunchRecord(string $fileName, float $scriptStartTime): array
+    public static function updateLaunchRecord(float $scriptStartTime): array
     {
         $key = self::floatToIntStr($scriptStartTime);
+        $fileName = Magic::$storage['launches_file'];
 
         $record = null;
         $new    = null;
@@ -68,9 +71,10 @@ class Launch
         return $record;
     }
 
-    public static function finalizeLaunchRecord(string $fileName, float $scriptStartTime, float $scriptEndTime, string $stopReason): array
+    public static function finalizeLaunchRecord(float $scriptStartTime, float $scriptEndTime, string $stopReason): array
     {
         $key = self::floatToIntStr($scriptStartTime);
+        $fileName = Magic::$storage['launches_file'];
 
         $record = null;
         $new    = null;
@@ -104,9 +108,10 @@ class Launch
         return $record;
     }
 
-    public static function getPreviousLaunch(object $eh, string $fileName, float $scriptStartTime): \Generator
+    public static function getPreviousLaunch(object $eh, float $scriptStartTime): \Generator
     {
         $key = self::floatToIntStr($scriptStartTime);
+        $fileName = Magic::$storage['launches_file'];
 
         $content = yield get($fileName);
         if ($content === '') {
@@ -140,9 +145,10 @@ class Launch
         return $launch;
     }
 
-    public static function appendBlockedRecord(string $fileName, float $scriptStartTime, string $stopReason = 'blocked'): array
+    public static function appendBlockedRecord(float $scriptStartTime, string $stopReason = 'blocked'): array
     {
         $key = self::floatToIntStr($scriptStartTime);
+        $fileName = Magic::$storage['launches_file'];
 
         $record['time_start']    = $key;
         $record['time_end']      = $key;

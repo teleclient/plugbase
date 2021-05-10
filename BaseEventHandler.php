@@ -24,14 +24,10 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     private float $handlerConstructed;
     private float $handlerUnserialized;
 
-    private array    $robotConfig;
     private int      $robotId;
     private string   $robotName;
-    private UserDate $userDate;
     private bool     $canExecute;
-    private string   $stopReason;
-    private string   $prefixes;
-    private bool     $notAuthorized;
+    private bool     $authorizationRevoked;
 
     function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
@@ -41,10 +37,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->handlerConstructed  = $now;
         $this->handlerUnserialized = $now;
 
-        $this->robotConfig = $GLOBALS['robotConfig'];
-        $this->userDate    = new \UserDate($this->robotConfig['zone']);
-
-        Logger::Log("EventHandler constructed at " . $this->userDate->format($now), Logger::ERROR);
+        Logger::Log("EventHandler constructed at " . $this->formatTime($now), Logger::ERROR);
 
         $this->initBaseEventHandler($now);
     }
@@ -54,19 +47,15 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $now = microtime(true);
         $this->handlerUnserialized = $now;
 
-        $this->robotConfig = $GLOBALS['robotConfig'];
-        $this->userDate    = new \UserDate($this->robotConfig['zone']);
-
-        Logger::log('EventHandler unserialized at ' . $this->userDate->format($now), Logger::ERROR);
+        Logger::log('EventHandler unserialized at ' . $this->formatTime($now), Logger::ERROR);
 
         $this->initBaseEventHandler($now);
     }
 
     private function initBaseEventHandler(float $now)
     {
-        Logger::log('EventHandler initialized at ' . $this->userDate->format($now), Logger::ERROR);
-        $this->notAuthorized = false;
-        $this->prefixes = $this->robotConfig['prefixes'] ?? '/!';
+        Logger::log('EventHandler initialized at ' . $this->formatTime($now), Logger::ERROR);
+        $this->authorizationRevoked = false;
 
         $handlerNames   = $this->getHandlerNames();
         $this->handlers = [];
@@ -87,7 +76,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         $eh = $this;
         $reason  = $eh->getStopReason();
-        $session = __DIR__ . '/' . $eh->getSessionName();
+        $session = $eh->getSessionName();
         if ($reason === 'logout') {
             if (file_exists($session)) {
                 unlink($session);
@@ -111,7 +100,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->stopReason = "UNKNOWN";
 
         $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
-        $record = \Launch::floatToDate($record, $this->userDate);
+        $record = \Launch::floatToDate($record, $this->getUserDate());
         Logger::log("EventHandler Update Run Record: " . toJSON($record, false), Logger::ERROR);
 
         $start = $this->formatTime(microtime(true));
@@ -208,25 +197,28 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         }
     }
 
-    public function notAuthorized(): Generator
+    public function authorizationRevoked(): Generator
     {
-        $this->notAuthorized = true;
-        $this->logger("FATAL: Authorization revoked at " . $this->formatTime() . '!', Logger::FATAL_ERROR);
+        $this->authorizationRevoked = true;
+        $text = "FATAL: Authorization revoked at " . $this->formatTime() . '!';
+        $this->logger($text, Logger::FATAL_ERROR);
         if (Shutdown::removeCallback('restarter')) {
             $this->logger('Self-Restarter disabled.', Logger::ERROR);
         }
         yield $this->stop();
         $this->setStopReason('sessiondelete');
         $this->destroyLoops();
+        trigger_error($text, E_USER_ERROR);
+        exit(1);
     }
-    public function isAuthorized(): bool
+    public function isAuthorizationRevoked(): bool
     {
-        return $this->notAuthorized;
+        return $this->authorizationRevoked;
     }
 
     public function getRobotConfig(): array
     {
-        return $this->robotConfig;
+        return Magic::$storage['robot_config'];
     }
 
     public function setSelf(array $self): void
@@ -255,7 +247,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function getAdminIds(): array
     {
-        return $this->robotConfig['adminIds'] ?? [];
+        return $this->getRobotConfig()['adminIds'] ?? [];
     }
     public function getOfficeId(): ?int
     {
@@ -264,16 +256,18 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function getUserDate(): \UserDate
     {
-        return $this->userDate;
+        return Magic::$storage['user_date'];
     }
+
     public function getZone(): string
     {
-        return $this->userDate->getZone();
+        return $this->getUserDate()->getZone();
     }
+
     function formatTime(float $microtime = null, string $format = 'H:i:s.v'): string
     {
         $microtime = $microtime ?? \microtime(true);
-        return $microtime < 100 ? 'UNAVAILABLE' : ($this->userDate->format($microtime, $format));
+        return $microtime < 100 ? 'UNAVAILABLE' : ($this->getUserDate()->format($microtime, $format));
     }
 
     public function canExecute(): bool
@@ -283,41 +277,41 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
 
     public function getStopReason(): string
     {
-        return $this->stopReason ?? 'UNKNOWN';
+        return Magic::$storage['stop_reason'];
     }
     public function setStopReason(string $stopReason): void
     {
-        $this->stopReason = $stopReason;
+        Magic::$storage['stop_reason'] = $stopReason;
     }
 
     function getEditMessage(): bool
     {
-        return $this->robotConfig['edit'] ?? true;
+        return $this->getRobotConfig()['edit'] ?? true;
     }
 
     function getSessionName(): string
     {
-        return __DIR__ . '/' . $this->robotConfig['mp'][0]['session'];
+        return Magic::$storage['session_name'];
     }
 
     function getLoopNames(): array
     {
-        return $this->robotConfig['mp'][0]['loops'] ?? [];
+        return $this->getRobotConfig()['mp'][0]['loops'] ?? [];
     }
 
     function getHandlerNames(): array
     {
-        return $this->robotConfig['mp'][0]['handlers'] ?? [];
+        return $this->getRobotConfig()['mp'][0]['handlers'] ?? [];
     }
 
     function getPrefixes(): string
     {
-        return $this->prefixes;
+        return $this->getRobotConfig()['prefixes'] ?? '/!';
     }
 
     function getScriptStarted(): float
     {
-        return SCRIPT_START_TIME; // $this->scriptStarted;
+        return Magic::$storage['script_start'];
     }
     function getHandlerConstructed(): float
     {
@@ -329,12 +323,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->handlerUnserialized;
     }
 
-    function getSession(): string
-    {
-        return \basename($this->session);
-    }
-
-    function recemtUpdate(array $update): bool
+    function recentUpdate(array $update): bool
     {
         return floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
     }
@@ -357,6 +346,11 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         return $this->loops[$name];
     }
 
+    function getScriptInfo(): string
+    {
+        return Magic::$storage['script_info'];
+    }
+
     public function getLoopState(string $loopName): string
     {
         $loopState = $this->__get("loopstate_$loopName");
@@ -369,11 +363,21 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     {
         $this->__set("loopstate_$loopName", $loopState);
     }
+
     public function destroyLoops()
     {
         foreach ($this->loops as $name => $loop) {
             $this->logger("The $name loop plugin destroyed!", Logger::ERROR);
             unset($this->loops[$name]);
+        }
+        gc_collect_cycles();
+    }
+
+    public function destroyHandlers()
+    {
+        foreach ($this->handlers as $name => $handler) {
+            $this->logger("The $name handler plugin destroyed!", Logger::ERROR);
+            unset($this->handlers[$name]);
         }
         gc_collect_cycles();
     }

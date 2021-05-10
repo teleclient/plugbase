@@ -12,7 +12,7 @@ class FilteredLogger
     private Logger $filteredLog;
     private Logger $callbackLog;
 
-    public function __construct(array &$robotConfig, $index)
+    public function __construct(array &$robotConfig, $index = 0)
     {
         \error_clear_last();
 
@@ -38,8 +38,9 @@ class FilteredLogger
             'logger_param' => $this,
             'logger_level' => $level,
         ]];
+
         unset($robotConfig['mp'][$index]['settings']['logger']);
-        $robotConfig['mp'][$index]['settings']['logger']['logger'] = Logger::CALLABLE_LOGGER;
+        $robotConfig['mp'][$index]['settings']['logger']['logger']       = Logger::CALLABLE_LOGGER;
         $robotConfig['mp'][$index]['settings']['logger']['logger_param'] = $this;
         $robotConfig['mp'][$index]['settings']['logger']['logger_level'] = $level;
 
