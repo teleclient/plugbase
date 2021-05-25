@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
+use danog\MadelineProto\Magic;
 
 class BuiltinHandler extends AbstractHandler implements Handler
 {
@@ -74,7 +75,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
             return false;
         }
 
-        if ($eh->recentMessage($update)) {
+        if ($eh->recentUpdate($update)) {
 
             //Function: Finnish executing the Stop command.
             if ($vars['msgText'] === self::STOPPING_MSG) {
@@ -152,7 +153,7 @@ class BuiltinHandler extends AbstractHandler implements Handler
                 $memoryLimit     = $memoryLimit === '-1' || $memoryLimit === '0' ? 'MAX' : $memoryLimit;
                 $eh->logger("Session Name: '" . $eh->getSessionName() . "'", Logger::ERROR);
                 $sessionSize     = formatBytes(\fileSize($eh->getSessionName()), 3);
-                $launch          = yield \Launch::getPreviousLaunch($eh, LAUNCHES_FILE, SCRIPT_START_TIME);
+                $launch          = yield \Launch::getPreviousLaunch($eh, Magic::$storage['launches_file'], Magic::$storage['script_start']);
                 if ($launch) {
                     $lastStartTime        = $eh->formatTime($launch['time_start']);
                     $lastEndTime          = $eh->formatTime($launch['time_end']);

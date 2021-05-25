@@ -6,6 +6,7 @@ use danog\MadelineProto\Logger;
 use danog\MadelineProto\Shutdown;
 use danog\MadelineProto\API;
 use danog\MadelineProto\MTProto;
+use danog\MadelineProto\Tools;
 use danog\MadelineProto\Magic;
 use Amp\Loop;
 use function Amp\File\{get, put, exists, getSize, touch};
@@ -41,7 +42,7 @@ Magic::$storage['settings']      = Magic::$storage['robot_config']['mp'][0]['set
 Magic::$storage['data_folder']   = 'data';
 Magic::$storage['startups_file'] = Magic::$storage['data_folder'] . '/' . 'startups.txt';
 Magic::$storage['launches_file'] = Magic::$storage['data_folder'] . '/' . 'launches.txt';
-Magic::$storage['creation_file'] = Magic::$storage['data_folder'] . '/' . 'creation.txt';
+Magic::$storage['authorization_file'] = Magic::$storage['data_folder'] . '/' . 'authorization.txt';
 
 if (!file_exists(Magic::$storage['data_folder'])) {
     \mkdir(Magic::$storage['data_folder']);
@@ -158,19 +159,40 @@ if (\defined('SIGINT')) {
     }
 }
 
+if (file_exists('data/badsession.txt')) {
+    $text = "The robot's session is logged out of, externally terminated, or its logged-in account is deleted!";
+    //Logger::log($text, Logger::ERROR);
+    //\closeConnection($text);
+    //echo ($text . PHP_EOL);
+    //exit(1);
+}
+
 Shutdown::addCallback(
     static function (): void {
         Logger::log('Duration dummy placeholder shutdown routine executed!', Logger::ERROR);
+        exit(1);
     },
     'duration'
 );
 
-Logger::log(file_exists(Magic::$storage['session_name']) ? 'Unserializing an existing sesson-file.' : 'Creating a new session-file.');
-Logger::log('Configured API Session: ' . Magic::$storage['session_name'], Logger::ERROR);
-//--------------------------------------------------------------------------
-$mp = new API(Magic::$storage['session_name'], Magic::$storage['settings']);
+$sessionAlreadyAuthorized = beenAuthorized();
+$sessionAlreadyCreated    = file_exists(Magic::$storage['session_name']);
+Logger::log($sessionAlreadyAuthorized ? 'The session already authorized.' : 'The session never authorized.');
+Logger::log($sessionAlreadyCreated ? 'Unserializing an existing sesson-file.' : 'Creating a new session-file.');
+try {
+    //--------------------------------------------------------------------------
+    $mp = new API(Magic::$storage['session_name'], Magic::$storage['settings']);
+    //--------------------------------------------------------------------------
+} catch (Throwable $e) {
+    Logger::log("Exception while creating the API object, exiting.", Logger::ERROR);
+    Logger::log((string)$e, Logger::ERROR);
+    exit();
+}
+if ($mp === null) {
+    Logger::log("new API is null, exiting.", Logger::ERROR);
+    exit();
+}
 $mp->async(true);
-//--------------------------------------------------------------------------
 $mp->logger('API Session: ' . $mp->session, Logger::ERROR);
 //\error_clear_last();
 
@@ -244,15 +266,22 @@ if (authorizationState($mp) === MTProto::LOGGED_IN && !$mp->hasAllAuth()) {
     if (PHP_SAPI === 'cli') {
         echo ($text . PHP_EOL);
     }
+    posix_kill(Magic::$storage['process_id'], SIGTERM);
+    exit(1);
+    /*
     gc_collect_cycles();
+    //fclose($mp->logger->stdout);
+    unset($mp->logger);
+    removeShutdownHandlers();
+    Magic::shutdown(1);
+
     set_error_handler(function () {
         $text = "Again! The robot's session is logged out of, externally terminated, or its account is deleted!";
         Logger::log($text, Logger::ERROR);
         register_shutdown_function(function () {
         });
-        exit(0);
+        exit(1);
     });
-    $var = 5 / 0;
     trigger_error($text, E_USER_ERROR);
 
     //posix_kill(Magic::$storage['process_id'], SIGINT);
@@ -274,19 +303,85 @@ if (authorizationState($mp) === MTProto::LOGGED_IN && !$mp->hasAllAuth()) {
     $var = 5 / 0;
     trigger_error($text, E_USER_ERROR);
     exit(0);
+    */
 }
-$mp->logger('We are here now: ' . $mp->session, Logger::ERROR);
-$mp->loop(static function () use ($mp) {
-    $mp->logger('We are here now 2: ' . $mp->session, Logger::ERROR);
-    $authStateBefore = authorizationState($mp);
-    $mp->logger('We are here now 3: ' . $mp->session, Logger::ERROR);
-    $stateBeforeStr  = authorizationStateDesc($authStateBefore);
-    $stopReasonSaved = Magic::$storage['stop_reason'];
-    Magic::$storage['stop_reason'] = $stateBeforeStr;
-    $mp->logger("About to call Start::startuser with authorization state '$stateBeforeStr'", Logger::ERROR);
-    $start = new Start($mp);
-    $me = yield $start->startUser(Magic::$storage['phone'], Magic::$storage['password']);
-    Magic::$storage['stop_reason'] = $stopReasonSaved;
+
+$authStateBefore = authorizationState($mp);
+$stateBeforeStr  = authorizationStateDesc($authStateBefore);
+$mp->logger("About to call Start::startuser with authorization state '$stateBeforeStr'", Logger::ERROR);
+$me = null;
+try {
+    $me = $mp->loop(static function () use ($mp): Generator {
+        // -------------------------------------------------
+        $start = new Start($mp);
+        $me = yield $start->startUser(Magic::$storage['phone'], Magic::$storage['password']);
+        return $me;
+        // -------------------------------------------------
+    });
+} catch (Throwable $e) {
+    exit(1);
+}
+$stateAfter    = authorizationState($mp);
+$stateAfterStr = authorizationStateDesc($stateAfter);
+$mp->logger("The call to Start::startuser returned. with authorization state '$stateAfterStr'", Logger::ERROR);
+
+$hasAllAuth = $authStateBefore === -2 ? false : $mp->hasAllAuth(); // -2 => 'UNINSTANTIATED_MTPROTO' => 'isset($api) && !isset($api->API)'
+$hasAllAuthText = "Has all authorizations: " . ($hasAllAuth ? "'true'" : "'false'");
+$mp->logger("Authorization state after invoking the start method is '$stateAfterStr'! " . $hasAllAuthText, Logger::ERROR);
+
+if ($hasAllAuth && $stateAfter === MTProto::LOGGED_IN) {
+    if (!beenAuthorized()) {
+        $mp->logger("Robot just successfully logged-in for the first time!", Logger::ERROR);
+        saveAuthorizationTime(Magic::$storage['script_start']);
+    } else {
+        $mp->logger("Robot was already logged-in.  Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+    }
+} elseif (!$hasAllAuth && $stateAfter === MTProto::LOGGED_IN) {
+    $mp->logger("Unsuccessful login.  Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+} else {
+    $mp->logger("Unsuccessful login 2.  Auth State: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
+}
+
+if ((!$me || !is_array($me)) && $stateAfter === MTProto::LOGGED_IN) {
+    throw new ErrorException('Invalid Self object');
+}
+\closeConnection('The roboot with the script ' . Magic::$storage['script_info'] . ' was started!');
+
+$loopRes = $mp->loop(static function () use ($mp): \Generator {
+    $eventHandler = BaseEventHandler::class;
+    if (!$mp->hasEventHandler()) {
+        yield $mp->setEventHandler($eventHandler);
+        $mp->logger("EventHandler is set!", Logger::ERROR);
+    } else {
+        yield $mp->setEventHandler($eventHandler); // For now. To be investigated
+        $mp->logger("EventHandler was already set!", Logger::ERROR);
+    }
+
+    if (\method_exists($eventHandler, 'finalizeStart')) {
+        $eh = $mp->getEventHandler($eventHandler);
+        yield $eh->finalizeStart($mp);
+    }
+});
+
+Logger::log('Before start and loop!');
+$loopRes = $mp->loop(function () use ($mp): \Generator {
+    $errors = [];
+    while (true) {
+        try {
+            Tools::wait(yield from $mp->API->loop());
+            break;
+        } catch (\Throwable $e) {
+            $errors = [\time() => $errors[\time()] ?? 0];
+            $errors[\time()]++;
+            $fatal = Logger::FATAL_ERROR;
+            if ($errors[\time()] > 10 && !$mp->inited()) {
+                yield $mp->logger->logger("More than 10 errors in a second and not inited, exiting!", $fatal);
+                break;
+            }
+            yield $mp->logger->logger((string) $e, $fatal);
+            yield $mp->report("Surfaced: $e");
+        }
+    }
 });
 
 \error_clear_last();
@@ -295,34 +390,6 @@ Logger::log('Bye, bye!', Logger::ERROR);
 Magic::$storage['clean'] = true;
 exit(0);
 
-Logger::log('Before start and loop!');
-safeStartAndLoop($mp, BaseEventHandler::class);
-
-
-function exceptionErrorHandler($errno = 0, $errstr = null, $errfile = null, $errline = null)
-{
-    Logger::log($errstr, Logger::FATAL_ERROR);
-    Magic::shutdown(1);
-    // If error is suppressed with @, don't throw an exception
-    if (
-        \error_reporting() === 0 ||
-        \strpos($errstr, 'headers already sent') ||
-        $errfile && (\strpos($errfile, 'vendor/amphp') !== false || \strpos($errfile, 'vendor/league') !== false)
-    ) {
-        return false;
-    }
-    echo ("errno: $errstr"          . PHP_EOL);
-    echo ("errstr: '$errstr??'''"   . PHP_EOL);
-    echo ("errfile: '$errfile??'''" . PHP_EOL);
-    echo ("errline: '$errline??'''" . PHP_EOL);
-    throw new \danog\MadelineProto\Exception($errstr, $errno, null, $errfile, $errline);
-}
-
-function exceptionHandler($exception)
-{
-    Logger::log($exception, Logger::FATAL_ERROR);
-    Magic::shutdown(1);
-}
 
 function safeConfig(array $robotConfig): array
 {
@@ -336,9 +403,9 @@ function safeConfig(array $robotConfig): array
     return $safeConfig;
 }
 
-function saveNewSessionCreation(float $creationTime): bool
+function saveAuthorizationTime(float $creationTime): bool
 {
-    $fullName = Magic::$storage['creation_file'];
+    $fullName = Magic::$storage['authorization_file'];
     if (file_exists($fullName)) {
         return false;
     } else {
@@ -347,11 +414,16 @@ function saveNewSessionCreation(float $creationTime): bool
         return true;
     }
 }
-function fetchSessionCreation(): float
+function fetchAuthorizationTime(): float
 {
-    $strval = file_get_contents(Magic::$storage['creation_file']);
+    $strval = file_get_contents(Magic::$storage['authorization_file']);
     return round(intval($strval) / 1000000);
 }
+function beenAuthorized(): bool
+{
+    return file_exists(Magic::$storage['authorization_file']);
+}
+
 
 function makeDataFiles(string $dirPath, array $baseNames): array
 {
@@ -393,7 +465,11 @@ function adjustSettings(array $robotConfig): array
     return array_replace_recursive($robotConfig, $replacement);
 }
 
-function beenAuthorized(): bool
+function setStopReason(string $reason): void
 {
-    return file_exists(Magic::$storage['creation_file']);
+    Magic::$storage['stop_reason'] = $reason;
+}
+function getStopReason(string $reason): string
+{
+    return Magic::$storage['stop_reason'];
 }

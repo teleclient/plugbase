@@ -429,7 +429,7 @@ function visitAllDialogs(object $mp, ?array $params, Closure $sliceCallback = nu
     } // end of while/for
 }
 
-function authorizationState(object $api): int
+function authorizationState(object /*API/EventHandler*/ $api): int
 {
     if (isset($api) && !isset($api->API)) {
         return -2;
@@ -811,10 +811,11 @@ function safeStartAndLoop(API $mp, string $eventHandler): void
                 }
                 */
 
+                /*
                 $stopReasonSaved = Magic::$storage['stop_reason'];
                 Magic::$storage['stop_reason'] = $stateBeforeStr;
                 $start = new Start($mp);
-                $me    = yield $start->start();
+                $me    = yield $start->startUser(Magic::$storage['phone'], Magic::$storage['password']);
                 Magic::$storage['stop_reason'] = $stopReasonSaved;
 
                 $stateAfter = authorizationState($mp);
@@ -825,11 +826,8 @@ function safeStartAndLoop(API $mp, string $eventHandler): void
                 if (!$hasAllAuth || $stateAfter !== MTProto::LOGGED_IN) {
                     $mp->logger("Auth State after invoking the start method: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
                 } else {
-                    if (!Magic::$storage['already_auth']) {
-                        $new = saveNewSessionCreation(SCRIPT_START_TIME);
-                        if (!$new) {
-                            throw new ErrorException('Session creation logic error');
-                        }
+                    if (!beenAuthorized()) {
+                        saveAuthorizationTime(Magic::$storage['script_start']);
                     }
                     $mp->logger("Auth State after invoking the start method: " . authorizationStateDesc(authorizationState($mp)), Logger::ERROR);
                     $mp->logger("Robot is successfully logged-in!", Logger::ERROR);
@@ -838,7 +836,9 @@ function safeStartAndLoop(API $mp, string $eventHandler): void
                     throw new ErrorException('Invalid Self object');
                 }
                 \closeConnection('The roboot with the script ' . Magic::$storage['script_info'] . ' was started!');
+                */
 
+                /*
                 if (!$mp->hasEventHandler()) {
                     yield $mp->setEventHandler($eventHandler);
                     yield $mp->logger("EventHandler is set!", Logger::ERROR);
@@ -851,8 +851,9 @@ function safeStartAndLoop(API $mp, string $eventHandler): void
                     $eh = $mp->getEventHandler($eventHandler);
                     yield $eh->finalizeStart($mp);
                 }
-
+                */
                 $started = true;
+
                 \danog\madelineproto\Tools::wait(yield from $mp->API->loop());
                 break;
             } catch (\Throwable $e) {
@@ -980,6 +981,7 @@ function removeShutdownHandlers(): void
 {
     $class = new ReflectionClass('danog\MadelineProto\Shutdown');
     $callbacks = $class->getStaticPropertyValue('callbacks');
+    $callbacks = [];
     //register_shutdown_function(function () {});
     Shutdown::removeCallback('restart');
     Shutdown::removeCallback(0);

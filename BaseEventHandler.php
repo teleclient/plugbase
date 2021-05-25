@@ -16,18 +16,18 @@ require_once 'AbstractLoop.php';
 
 class BaseEventHandler extends \danog\MadelineProto\EventHandler
 {
-    private API   $mp;
+    private API    $mp;
 
-    private array $handlers;
-    private array $loops;
+    private array  $handlers;
+    private array  $loops;
 
-    private float $handlerConstructed;
-    private float $handlerUnserialized;
+    private float  $handlerConstructed;
+    private float  $handlerUnserialized;
 
-    private int      $robotId;
-    private string   $robotName;
-    private bool     $canExecute;
-    private bool     $authorizationRevoked;
+    private int    $robotId;
+    private string $robotName;
+    private bool   $canExecute;
+    private bool   $authorizationRevoked;
 
     function __construct(\danog\MadelineProto\APIWrapper $apiWrapper)
     {
@@ -99,7 +99,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         $this->canExecute = false;
         $this->stopReason = "UNKNOWN";
 
-        $record = \Launch::updateLaunchRecord(LAUNCHES_FILE, SCRIPT_START_TIME);
+        $record = \Launch::updateLaunchRecord(Magic::$storage['script_start']);
         $record = \Launch::floatToDate($record, $this->getUserDate());
         Logger::log("EventHandler Update Run Record: " . toJSON($record, false), Logger::ERROR);
 
@@ -171,11 +171,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
     public function onAny(array $update): \Generator
     {
         $verb = $this->possiblyVerb($update, $this->getPrefixes(), 30);
-        //$msgFront = substr($update['message']['message'] ?? '', 0, 30);
-        //$this->logger("PossibleVerb: '$verb', recentMessage: " . ($this->recentMessage($update) ? 'yes' : 'no') . "  msgType: {$update['_']}  msg: '$msgFront'", Logger::ERROR);
-        //$isNew = floatval($update['message']['date'] ?? 0) >= $this->getScriptStarted();
-        if (!$this->canExecute && $verb !== '' && $this->recentMessage($update)) {
-            $this->recentMessage($update);
+        if (!$this->canExecute && $verb !== '' && $this->recentUpdate($update)) {
             $this->canExecute = true;
             $this->logger('Command-Processing engine started at ' . $this->formatTime(), Logger::ERROR);
         }
@@ -208,6 +204,7 @@ class BaseEventHandler extends \danog\MadelineProto\EventHandler
         yield $this->stop();
         $this->setStopReason('sessiondelete');
         $this->destroyLoops();
+        \touch('data\badsession.txt');
         trigger_error($text, E_USER_ERROR);
         exit(1);
     }

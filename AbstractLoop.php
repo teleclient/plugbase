@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use danog\MadelineProto\API;
 use danog\MadelineProto\Logger;
+use danog\MadelineProto\Magic;
 use danog\MadelineProto\Loop\Impl\ResumableSignalLoop;
 
 abstract class AbstractLoop extends ResumableSignalLoop
@@ -22,8 +23,8 @@ abstract class AbstractLoop extends ResumableSignalLoop
         parent::__construct($mp);
         $this->mp = $mp;
         $this->eh = $eh;
-        $this->robotConfig = $GLOBALS['robotConfig'];
-        $this->userDate = new \UserDate($robotConfig['zone'] ?? 'America/Los_Angeles');
+        $this->robotConfig = Magic::$storage['robot_config'];
+        $this->userDate    = Magic::$storage['user_date'];
         $this->eh->logger("AbstractLoop constructor for the '{$this}' is invoked!", Logger::ERROR);
     }
 
