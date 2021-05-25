@@ -14,6 +14,7 @@ copy($srcRoot . "Handler.php",          $buildRoot . "Handler.php");
 copy($srcRoot . "AbstractHandler.php",  $buildRoot . "AbstractHandler.php");
 copy($srcRoot . "Loop.php",             $buildRoot . "Loop.php");
 copy($srcRoot . "AbstractLoop.php",     $buildRoot . "AbstractLoop.php");
+copy($srcRoot . "Start.php",            $buildRoot . "Start.php");
 copy($srcRoot . ".htaccess",            $buildRoot . ".htaccess");
 
 if (!file_exists('build/utils')) {
